@@ -248,6 +248,19 @@ const PadCard = ({ children, style }) => (
     </Card>
 );
 
+const hoverBorderButtonProps = (baseColor = T.txt3, hoverColor = T.txt1, hoverBorder = T.borderHi, hoverBackground = T.raised) => ({
+    onMouseEnter: e => {
+        e.currentTarget.style.color = hoverColor;
+        e.currentTarget.style.borderColor = hoverBorder;
+        e.currentTarget.style.background = hoverBackground;
+    },
+    onMouseLeave: e => {
+        e.currentTarget.style.color = baseColor;
+        e.currentTarget.style.borderColor = T.border;
+        e.currentTarget.style.background = 'transparent';
+    },
+});
+
 const Divider = () => <div style={{ height:1, background:T.border }} />;
 
 const Pagination = ({ current, total, onPrev, onNext, jumpPage, onJumpChange, onJumpKey }) => {
@@ -1074,8 +1087,7 @@ const Dashboard = () => {
                                         style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px',
                                             fontSize:12, fontWeight:600, borderRadius:6, cursor:'pointer',
                                             background:T.surface, border:`1px solid ${T.border}`, color:T.txt2, transition:'all 0.15s' }}
-                                        onMouseEnter={e => { e.currentTarget.style.color = T.txt1; e.currentTarget.style.borderColor = T.borderHi; }}
-                                        onMouseLeave={e => { e.currentTarget.style.color = T.txt2; e.currentTarget.style.borderColor = T.border; }}>
+                                        {...hoverBorderButtonProps(T.txt2)}>
                                         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
@@ -1163,16 +1175,14 @@ const Dashboard = () => {
                                                                 style={{ padding:'5px 10px', fontSize:11, fontWeight:600, borderRadius:5,
                                                                     background:'transparent', border:`1px solid ${T.border}`,
                                                                     color:T.txt3, cursor:'pointer', transition:'all 0.15s' }}
-                                                                onMouseEnter={e => { e.currentTarget.style.color = T.ok; e.currentTarget.style.borderColor = '#163028'; e.currentTarget.style.background = T.okBg; }}
-                                                                onMouseLeave={e => { e.currentTarget.style.color = T.txt3; e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = 'transparent'; }}>
+                                                                {...hoverBorderButtonProps(T.txt3, T.ok, '#163028', T.okBg)}>
                                                                 Safe
                                                             </button>
                                                             <button onClick={e => { e.stopPropagation(); setSelectedAccount(alert); }}
                                                                 style={{ padding:'5px 12px', fontSize:11, fontWeight:600, borderRadius:5,
                                                                     background:T.accentBg, border:`1px solid ${T.accent}30`,
                                                                     color:T.accent, cursor:'pointer', transition:'all 0.15s' }}
-                                                                onMouseEnter={e => { e.currentTarget.style.background = T.accent; e.currentTarget.style.color = '#fff'; }}
-                                                                onMouseLeave={e => { e.currentTarget.style.background = T.accentBg; e.currentTarget.style.color = T.accent; }}>
+                                                                {...hoverBorderButtonProps(T.accent, '#fff', T.accent, T.accent)}>
                                                                 Inspect
                                                             </button>
                                                         </div>
@@ -1350,8 +1360,7 @@ const Dashboard = () => {
                                 <button onClick={() => setSelectedAccount(null)}
                                     style={{ padding:'7px 10px', borderRadius:6, background:'transparent',
                                         border:`1px solid ${T.border}`, color:T.txt3, cursor:'pointer', transition:'all 0.15s' }}
-                                    onMouseEnter={e => { e.currentTarget.style.color = T.txt1; e.currentTarget.style.borderColor = T.borderHi; }}
-                                    onMouseLeave={e => { e.currentTarget.style.color = T.txt3; e.currentTarget.style.borderColor = T.border; }}>
+                                    {...hoverBorderButtonProps(T.txt3)}>
                                     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
