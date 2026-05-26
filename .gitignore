@@ -1,0 +1,11 @@
+.vscode/
+backend/node_modules/
+frontend/node_modules/
+ml-pipeline/venv/
+ml-pipeline/__pycache__/
+ml-pipeline/**/*.pyc
+ml-pipeline/models/
+ml-pipeline/outputs/
+ml-pipeline/nexus_alerts.json
+ml-pipeline/data/live_stream_*.csv
+ml-pipeline/data/hackathon_mule_data.csv

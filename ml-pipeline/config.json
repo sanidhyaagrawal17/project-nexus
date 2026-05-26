@@ -1,0 +1,25 @@
+{
+    "data_contract": {
+        "dataset_path": "data/hackathon_mule_data.csv",
+        "export_path": "nexus_alerts.json",
+        "target_column": "F3924",
+        "raw_id_column": "Unnamed: 0",
+        "clean_id_name": "Account_ID",
+        "minimum_required_columns": 3000
+    },
+    "graph_data_contract": {
+        "dataset_path": "data/demo_transaction_graph.csv",
+        "source_account_column": "source_account",
+        "destination_account_column": "destination_account",
+        "amount_column": "amount",
+        "timestamp_column": "timestamp",
+        "label_column": "F3924",
+        "supported_input_format": "transaction edge list"
+    },
+    "model_parameters": {
+        "isolation_forest_contamination": 0.05,
+        "xgboost_estimators": 200,
+        "xgboost_max_depth": 5,
+        "xgboost_learning_rate": 0.1
+    }
+}
