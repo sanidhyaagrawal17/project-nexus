@@ -242,6 +242,12 @@ const Card = ({ children, style }) => (
     </div>
 );
 
+const PadCard = ({ children, style }) => (
+    <Card style={{ padding:20, ...style }}>
+        {children}
+    </Card>
+);
+
 const Divider = () => <div style={{ height:1, background:T.border }} />;
 
 const Pagination = ({ current, total, onPrev, onNext, jumpPage, onJumpChange, onJumpKey }) => {
@@ -909,7 +915,7 @@ const Dashboard = () => {
                             {/* Problem alignment card removed */}
 
                             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
-                                <Card style={{ padding:20 }}>
+                                <PadCard>
                                     <PanelHeader
                                         kicker="Threshold sweep"
                                         title="Alert volume by threshold"
@@ -934,9 +940,9 @@ const Dashboard = () => {
                                     <div style={{ marginTop:12, fontSize:11, color:T.txt3, lineHeight:1.4 }}>
                                         Pruned {droppedFeatures.length} correlated features to keep the schema lean.
                                     </div>
-                                </Card>
+                                </PadCard>
 
-                                <Card style={{ padding:20 }}>
+                                <PadCard>
                                     <PanelHeader
                                         kicker="Threshold sweep"
                                         title="Detection quality by threshold"
@@ -960,9 +966,9 @@ const Dashboard = () => {
                                             <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No threshold curve</div>
                                         )}
                                     </div>
-                                </Card>
+                                </PadCard>
 
-                                <Card style={{ padding:20 }}>
+                                <PadCard>
                                     <PanelHeader
                                         kicker="Alert mix"
                                         title="Critical vs high-risk share"
@@ -983,9 +989,9 @@ const Dashboard = () => {
                                             <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No data</div>
                                         )}
                                     </div>
-                                </Card>
+                                </PadCard>
 
-                                <Card style={{ padding:20 }}>
+                                <PadCard>
                                     <PanelHeader
                                         kicker="Signal frequency"
                                         title="Most frequent anomaly signals"
@@ -1005,9 +1011,9 @@ const Dashboard = () => {
                                             <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No data</div>
                                         )}
                                     </div>
-                                </Card>
+                                </PadCard>
                             </div>
-                            <Card style={{ padding:20, marginTop:14 }}>
+                            <PadCard style={{ marginTop:14 }}>
                                 <PanelHeader
                                     kicker="Feature importance"
                                     title="Top Feature Importance"
@@ -1028,7 +1034,7 @@ const Dashboard = () => {
                                         <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No importance data</div>
                                     )}
                                 </div>
-                            </Card>
+                            </PadCard>
                         </div>
                     )}
 
