@@ -9,6 +9,7 @@ from sklearn.metrics import (
     average_precision_score,
     classification_report,
     confusion_matrix,
+    fbeta_score,
     f1_score,
     precision_score,
     recall_score,
@@ -69,7 +70,7 @@ def _safe_divide(numerator, denominator):
     return np.nan_to_num(result)
 
 
-def engineer_features(X: pd.DataFrame) -> pd.DataFrame:
+def engineer_features(X: pd.DataFrame, enable_velocity_features: bool = False) -> pd.DataFrame:
     """Create row-level behavioral features used by both training and inference."""
     engineered = to_numeric_frame(X)
     present_high_priority = [col for col in HIGH_PRIORITY_FEATURES if col in engineered.columns]
@@ -85,9 +86,11 @@ def engineer_features(X: pd.DataFrame) -> pd.DataFrame:
     engineered['feature_density'] = _safe_divide(engineered['row_non_zero_count'], float(max(len(X.columns), 1)))
     engineered['burstiness_index'] = _safe_divide(engineered['row_abs_sum'], engineered['row_non_zero_count'].replace(0, np.nan))
 
-    rolling_mean = engineered['row_abs_sum'].rolling(window=5, min_periods=1).mean()
-    engineered['velocity_delta_5'] = engineered['row_abs_sum'].diff().fillna(0.0)
-    engineered['velocity_acceleration_5'] = (engineered['row_abs_sum'] - rolling_mean).fillna(0.0)
+    # Fix: only compute velocity features for sequential data; wide-table rows are independent accounts.
+    if enable_velocity_features:
+        rolling_mean = engineered['row_abs_sum'].rolling(window=5, min_periods=1).mean()
+        engineered['velocity_delta_5'] = engineered['row_abs_sum'].diff().fillna(0.0)
+        engineered['velocity_acceleration_5'] = (engineered['row_abs_sum'] - rolling_mean).fillna(0.0)
 
     if present_high_priority:
         # Preserve the bank-validated signals as explicit rollups so they remain visible in exports.
@@ -190,7 +193,7 @@ def prepare_dataframe(df: pd.DataFrame, target_col: str = TARGET_COL):
 
     original_feature_count = len([column for column in df.columns if column not in exclude_cols])
     X = to_numeric_frame(df.drop(columns=[c for c in exclude_cols if c in df.columns], errors='ignore'))
-    X = engineer_features(X)
+    X = engineer_features(X, enable_velocity_features=False)
     feature_columns = list(X.columns)
     entity_ids = df[id_col].astype(str) if id_col else pd.Series([f'ROW-{index}' for index in df.index], index=df.index)
     X.index = entity_ids.values
@@ -233,27 +236,29 @@ def compute_model_metrics(y_true, y_prob, threshold: float):
 
 
 def optimize_threshold(y_true, y_prob):
-    """Pick the alert threshold that maximizes F1 on validation probabilities."""
+    """Pick the alert threshold that maximizes F-beta (beta=2) on validation probabilities."""
+    # Fix: weight recall more heavily than precision so the search favors catching fraud.
     search_space = np.arange(0.05, 0.995, 0.01)
     best_threshold = 0.5
-    best_f1 = -1.0
+    best_fbeta = -1.0
     best_precision = 0.0
     best_recall = 0.0
     for threshold in search_space:
         y_pred = (np.asarray(y_prob) >= threshold).astype(int)
-        f1 = f1_score(y_true, y_pred, zero_division=0)
+        fbeta = fbeta_score(y_true, y_pred, beta=2, zero_division=0)
         precision = precision_score(y_true, y_pred, zero_division=0)
         recall = recall_score(y_true, y_pred, zero_division=0)
-        if f1 > best_f1 or (f1 == best_f1 and precision >= best_precision):
+        if fbeta > best_fbeta or (fbeta == best_fbeta and recall >= best_recall):
             best_threshold = float(threshold)
-            best_f1 = float(f1)
+            best_fbeta = float(fbeta)
             best_precision = float(precision)
             best_recall = float(recall)
     critical_threshold = min(0.99, max(best_threshold + 0.12, 0.95))
     return {
         'alert_threshold': float(round(best_threshold, 2)),
         'critical_threshold': float(round(critical_threshold, 2)),
-        'best_f1': float(best_f1),
+        'best_fbeta': float(best_fbeta),
+        'best_f1': float(best_fbeta),  # Legacy compatibility alias.
         'best_precision': float(best_precision),
         'best_recall': float(best_recall),
     }

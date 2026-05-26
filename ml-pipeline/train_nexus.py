@@ -46,6 +46,71 @@ def _resolve_data_path(argv):
     return data_path
 
 
+def _has_flag(argv, flag_name):
+    return flag_name in argv
+
+
+def _load_feedback_labels():
+    try:
+        from pymongo import MongoClient
+    except Exception as exc:
+        print(f"[!] Feedback retraining disabled: pymongo is unavailable ({exc}).")
+        return {}
+
+    mongo_uri = os.getenv('MONGO_URI') or os.getenv('MONGODB_URI') or 'mongodb://localhost:27017'
+    try:
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=4000)
+        db = client['nexusDB']
+        collection_names = db.list_collection_names()
+        preferred_names = ['AnalystFeedback', 'analystfeedbacks', 'analystfeedback']
+        collection_name = next((name for name in preferred_names if name in collection_names), None)
+        if collection_name is None:
+            print('[*] No AnalystFeedback collection found in nexusDB; skipping feedback retraining.')
+            return {}
+
+        collection = db[collection_name]
+        query = {'decision': {'$in': ['CONFIRMED_FRAUD', 'SAFE']}}
+        projection = {'_id': 0, 'accountId': 1, 'Account_ID': 1, 'decision': 1}
+        records = list(collection.find(query, projection))
+    except Exception as exc:
+        print(f"[!] Failed to load feedback labels from MongoDB: {exc}")
+        return {}
+
+    feedback_labels = {}
+    for record in records:
+        account_id = record.get('accountId', record.get('Account_ID'))
+        decision = record.get('decision')
+        if account_id is None or decision not in ('CONFIRMED_FRAUD', 'SAFE'):
+            continue
+        feedback_labels[str(account_id)] = 1 if decision == 'CONFIRMED_FRAUD' else 0
+
+    print(f'[*] Loaded {len(feedback_labels)} verified analyst feedback labels from MongoDB.')
+    return feedback_labels
+
+
+def _merge_feedback_into_labels(X, y, feedback_labels):
+    if not feedback_labels:
+        return X, y, 0, 0
+
+    y_series = y.copy() if y is not None else pd.Series(index=X.index, dtype='float64', name=TARGET_COL)
+    original_positive = int((y_series == 1).sum()) if y_series.notna().any() else 0
+    matched = 0
+    for account_id, label in feedback_labels.items():
+        if account_id in y_series.index:
+            y_series.loc[account_id] = int(label)
+            matched += 1
+
+    if y is None:
+        labeled_mask = y_series.notna()
+        X = X.loc[labeled_mask].copy()
+        y_series = y_series.loc[labeled_mask].astype(int)
+    else:
+        y_series = y_series.astype(int)
+
+    updated_positive = int((y_series == 1).sum())
+    return X, y_series, matched, max(updated_positive - original_positive, 0)
+
+
 def _load_dataframe(data_path):
     try:
         return pd.read_csv(data_path, low_memory=False)
@@ -119,15 +184,25 @@ def run_nexus_pipeline():
     print(f'[*] Loading dataset from {data_path}...')
     df = _load_dataframe(data_path)
     df_clean = clean_column_names(df)
+    retrain_with_feedback = _has_flag(sys.argv, '--retrain-with-feedback')
+    feedback_labels = _load_feedback_labels() if retrain_with_feedback else {}
+
     X, y, metadata = prepare_dataframe(df_clean)
 
-    if y is None:
+    if y is None and not retrain_with_feedback:
         print(f"[CRITICAL ERROR] Target column '{TARGET_COL}' was not found or could not be cleaned.")
         sys.exit(1)
 
-    if len(X) < 20 or y.nunique() < 2:
+    if y is not None and (len(X) < 20 or y.nunique() < 2):
         print('[CRITICAL ERROR] Dataset does not contain enough signal for supervised training.')
         sys.exit(1)
+
+    if retrain_with_feedback:
+        X, y, matched_feedback, added_positive = _merge_feedback_into_labels(X, y, feedback_labels)
+        print(f'[*] Feedback retraining merged {matched_feedback} labeled accounts into training data ({added_positive} newly positive labels).')
+        if y is None or len(X) < 20 or y.nunique() < 2:
+            print('[CRITICAL ERROR] Feedback retraining did not leave enough labeled signal for training.')
+            sys.exit(1)
 
     print(f'[*] Prepared feature matrix: {X.shape[0]} rows x {X.shape[1]} columns.')
     print(f"[*] Target distribution:\n{y.value_counts(normalize=True) * 100}")
@@ -157,7 +232,8 @@ def run_nexus_pipeline():
     test_account_ids = X_test.index.astype(str).tolist()
 
     print('\n[*] Phase 1: Running Isolation Forest...')
-    iso_forest = IsolationForest(contamination=0.05, random_state=42)
+    # Fix: use a contamination rate that matches the true fraud prevalence instead of over-flagging rows.
+    iso_forest = IsolationForest(contamination=0.01, random_state=42)
     iso_forest.fit(X_train)
 
     X_train_enhanced = X_train.copy()
@@ -180,6 +256,8 @@ def run_nexus_pipeline():
         colsample_bytree=0.8,
         min_child_weight=3,
         reg_lambda=10,
+        n_jobs=-1,
+        tree_method='hist',
         random_state=42,
         eval_metric='logloss',
     )
@@ -199,17 +277,13 @@ def run_nexus_pipeline():
     except Exception as exc:
         print(f'[!] Calibration skipped: {exc}')
 
+    # Fix: keep calibrated probabilities untouched so threshold tuning and metrics remain valid.
     validation_probabilities = calibrated_model.predict_proba(X_calib_enhanced)[:, 1]
-    
-    # Inject synthetic noise to prevent perfect 1.000 scores that look like static/fake bugs
-    np.random.seed(42)
-    validation_probabilities = np.clip(validation_probabilities + np.random.normal(0, 0.08, size=len(validation_probabilities)), 0, 1)
 
     threshold_settings = optimize_threshold(y_calib, validation_probabilities)
     threshold_curve = build_threshold_curve(y_calib, validation_probabilities)
 
     test_probabilities = calibrated_model.predict_proba(X_test_enhanced)[:, 1]
-    test_probabilities = np.clip(test_probabilities + np.random.normal(0, 0.08, size=len(test_probabilities)), 0, 1)
 
     metrics = compute_model_metrics(y_test, test_probabilities, threshold_settings['alert_threshold'])
     metrics['calibration_used'] = calibration_available
