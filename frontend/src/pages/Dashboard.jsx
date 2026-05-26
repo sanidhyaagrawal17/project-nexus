@@ -219,6 +219,22 @@ const TD = ({ children, right, mono, muted }) => (
     </td>
 );
 
+const MetricCard = ({ label, value, color = T.txt1, note }) => (
+    <Card style={{ padding:'16px 18px' }}>
+        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{label}</div>
+        <div style={{ fontSize:24, fontWeight:700, color, fontFamily:'monospace' }}>{value}</div>
+        {note && <div style={{ fontSize:11, color:T.txt3, marginTop:6 }}>{note}</div>}
+    </Card>
+);
+
+const PanelHeader = ({ kicker, title, description }) => (
+    <>
+        <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{kicker}</div>
+        <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>{title}</div>
+        {description ? <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>{description}</div> : null}
+    </>
+);
+
 const Card = ({ children, style }) => (
     <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8,
         overflow:'hidden', ...style }}>
@@ -804,12 +820,7 @@ const Dashboard = () => {
                                     { label:'Critical Threats',       value:critCount,                    color:T.crit  },
                                     { label:'High Risk Anomalies',    value:highCount,                    color:T.high  },
                                 ].map(({ label, value, color }) => (
-                                    <Card key={label} style={{ padding:'20px 22px' }}>
-                                        <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase',
-                                            letterSpacing:'0.08em', marginBottom:10 }}>{label}</div>
-                                        <div style={{ fontSize:32, fontWeight:600, color, fontFamily:'monospace',
-                                            letterSpacing:'-0.02em', lineHeight:1 }}>{value}</div>
-                                    </Card>
+                                    <MetricCard key={label} label={label} value={value} color={color} />
                                 ))}
                             </div>
 
@@ -883,24 +894,27 @@ const Dashboard = () => {
                                     { label:'Alert Threshold', value:modelConfig?.alert_threshold?.toFixed ? modelConfig.alert_threshold.toFixed(2) : (modelConfig?.alert_threshold ?? '0.85') },
                                     { label:'Critical Threshold', value:modelConfig?.critical_threshold?.toFixed ? modelConfig.critical_threshold.toFixed(2) : (modelConfig?.critical_threshold ?? '0.95') },
                                     { label:'ROC AUC', value: formatMetricDisplay(modelMetrics?.roc_auc, modelMetrics?.sample_count) },
-                                        { label:'PR AUC', value: formatMetricDisplay(modelMetrics?.pr_auc, modelMetrics?.sample_count) },
+                                    { label:'PR AUC', value: formatMetricDisplay(modelMetrics?.pr_auc, modelMetrics?.sample_count) },
                                 ].map(({ label, value }) => (
-                                    <Card key={label} style={{ padding:'16px 18px' }}>
-                                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{label}</div>
-                                        <div style={{ fontSize:24, fontWeight:700, color:T.txt1, fontFamily:'monospace' }}>{value}</div>
-                                        {((label === 'ROC AUC' || label === 'PR AUC') && modelMetrics?.sample_count && modelMetrics.sample_count < 20) && (
-                                            <div style={{ fontSize:11, color:T.txt3, marginTop:6 }}>Insufficient samples to reliably show this metric</div>
-                                        )}
-                                    </Card>
+                                    <MetricCard
+                                        key={label}
+                                        label={label}
+                                        value={value}
+                                        note={((label === 'ROC AUC' || label === 'PR AUC') && modelMetrics?.sample_count && modelMetrics.sample_count < 20)
+                                            ? 'Insufficient samples to reliably show this metric'
+                                            : null}
+                                    />
                                 ))}
                             </div>
                             {/* Problem alignment card removed */}
 
                             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
                                 <Card style={{ padding:20 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Threshold sweep</div>
-                                    <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>Alert volume by threshold</div>
-                                    <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>This chart answers a single question: how many alerts remain as the cutoff rises?</div>
+                                    <PanelHeader
+                                        kicker="Threshold sweep"
+                                        title="Alert volume by threshold"
+                                        description="This chart answers a single question: how many alerts remain as the cutoff rises?"
+                                    />
                                     <div style={{ height:240 }}>
                                         {thresholdCurve.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
@@ -923,9 +937,11 @@ const Dashboard = () => {
                                 </Card>
 
                                 <Card style={{ padding:20 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Threshold sweep</div>
-                                    <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>Detection quality by threshold</div>
-                                    <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>Precision, recall, and F1 are shown on the same scale so the trade-off is obvious.</div>
+                                    <PanelHeader
+                                        kicker="Threshold sweep"
+                                        title="Detection quality by threshold"
+                                        description="Precision, recall, and F1 are shown on the same scale so the trade-off is obvious."
+                                    />
                                     <div style={{ height:240 }}>
                                         {thresholdCurve.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
@@ -947,9 +963,11 @@ const Dashboard = () => {
                                 </Card>
 
                                 <Card style={{ padding:20 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Alert mix</div>
-                                    <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>Critical vs high-risk share</div>
-                                    <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>This shows the alert population split at the current thresholds.</div>
+                                    <PanelHeader
+                                        kicker="Alert mix"
+                                        title="Critical vs high-risk share"
+                                        description="This shows the alert population split at the current thresholds."
+                                    />
                                     <div style={{ height:260 }}>
                                         {activeAlerts.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
@@ -968,9 +986,11 @@ const Dashboard = () => {
                                 </Card>
 
                                 <Card style={{ padding:20 }}>
-                                    <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Signal frequency</div>
-                                    <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>Most frequent anomaly signals</div>
-                                    <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>The top repeated signals help explain which behaviors are dominating the current batch.</div>
+                                    <PanelHeader
+                                        kicker="Signal frequency"
+                                        title="Most frequent anomaly signals"
+                                        description="The top repeated signals help explain which behaviors are dominating the current batch."
+                                    />
                                     <div style={{ height:260 }}>
                                         {featureData.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
@@ -988,8 +1008,11 @@ const Dashboard = () => {
                                 </Card>
                             </div>
                             <Card style={{ padding:20, marginTop:14 }}>
-                                <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase',
-                                    letterSpacing:'0.08em', marginBottom:16 }}>Top Feature Importance</div>
+                                <PanelHeader
+                                    kicker="Feature importance"
+                                    title="Top Feature Importance"
+                                    description={null}
+                                />
                                 <div style={{ height:280 }}>
                                     {featureImportance.length > 0 ? (
                                         <ResponsiveContainer width="100%" height="100%">
