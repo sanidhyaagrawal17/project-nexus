@@ -68,6 +68,15 @@ def _safe_divide(numerator, denominator):
     return np.nan_to_num(result)
 
 
+def _normalize_numeric_text(value):
+    if isinstance(value, str):
+        text = value.strip()
+        while len(text) >= 2 and ((text.startswith('[') and text.endswith(']')) or (text.startswith('(') and text.endswith(')'))):
+            text = text[1:-1].strip()
+        return text.replace(',', '')
+    return value
+
+
 def _coerce_timestamp(series):
     timestamps = pd.to_datetime(series, errors='coerce', utc=True)
     try:
@@ -98,7 +107,7 @@ def build_transaction_graph_features(df: pd.DataFrame, target_col: str = 'F3924'
         raise ValueError('Transaction graph input does not contain any valid edges.')
 
     if amount_col is not None:
-        working['__amount__'] = pd.to_numeric(working[amount_col], errors='coerce').fillna(0.0)
+        working['__amount__'] = pd.to_numeric(working[amount_col].map(_normalize_numeric_text), errors='coerce').fillna(0.0)
     else:
         working['__amount__'] = 1.0
 
@@ -235,7 +244,7 @@ def build_transaction_graph_features(df: pd.DataFrame, target_col: str = 'F3924'
     actual_label_col = label_col
     if actual_label_col is not None:
         label_frame = working[[source_col, actual_label_col]].copy()
-        label_frame[actual_label_col] = pd.to_numeric(label_frame[actual_label_col], errors='coerce').fillna(0).astype(int)
+        label_frame[actual_label_col] = pd.to_numeric(label_frame[actual_label_col].map(_normalize_numeric_text), errors='coerce').fillna(0).astype(int)
         y = label_frame.groupby(source_col)[actual_label_col].max().reindex(features.index, fill_value=0).astype(int)
         y.index.name = 'Account_ID'
 

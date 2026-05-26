@@ -199,7 +199,7 @@ app.post('/api/upload', upload.single('telemetryFile'), async (req, res) => {
                     await ProcessedFile.findOneAndUpdate(
                         { fileHash: fileHash },
                         { $set: { totalAccountsScanned: parsedData.totalScanned || 0 } },
-                        { new: true } // Forces Mongo to finish writing to disk before moving on
+                        { returnDocument: 'after' }
                     );
 
                     const hydratedAlerts = parsedData.data.map(alert => ({

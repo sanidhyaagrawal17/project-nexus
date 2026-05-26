@@ -444,7 +444,7 @@ const Dashboard = () => {
     const exportToCSV = () => {
         const rows = activeAlerts.map(a => {
             const features = getAlertFeatures(a);
-            const explanation = features.map(f => `${f.name}:${(f.contribution ?? 0).toFixed(3)}`).join(' | ');
+            const explanation = features.map(f => `${f.name}:${String(f.contribution ?? 0)}`).join(' | ');
             return `${a.accountId},${a.riskScore},${a.anomalyScore},${a.status},"${explanation}",${a.sourceFileName}`;
         });
         const a = document.createElement('a');
@@ -1145,7 +1145,11 @@ const Dashboard = () => {
                                                             {getAlertFeatures(alert).map((fObj, idx) => {
                                                                 const f = fObj.name;
                                                                 const cat = featureCat(f);
-                                                                const isPos = (fObj.contribution || 0) > 0;
+                                                                const contribution = Number(fObj.contribution || 0);
+                                                                const isPos = contribution > 0;
+                                                                const isNeg = contribution < 0;
+                                                                const shapLabel = isPos ? '▲ Increased Risk' : isNeg ? '▼ Decreased Risk' : '• Neutral Impact';
+                                                                const shapValue = Number.isFinite(contribution) ? String(contribution) : '0';
                                                                 return (
                                                                     <div key={f + idx} style={{ display:'flex', alignItems:'center', gap:8 }}>
                                                                         <span style={{ fontSize:10, fontFamily:'monospace', fontWeight:700,
@@ -1156,9 +1160,9 @@ const Dashboard = () => {
                                                                         <div style={{ display:'flex', flexDirection:'column' }}>
                                                                             <span style={{ fontSize:12, color:T.txt1 }}>{translate(f)}</span>
                                                                             {fObj.contribution !== null && (
-                                                                                <span style={{ fontSize:10, color: isPos ? T.crit : T.ok, fontWeight:600, display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                                                                                    {isPos ? '▲ Increased Risk' : '▼ Decreased Risk'} 
-                                                                                    <span style={{ color:T.txt3, fontWeight:400 }}>(SHAP {isPos?'+':''}{fObj.contribution.toFixed(2)})</span>
+                                                                                <span style={{ fontSize:10, color: isPos ? T.crit : isNeg ? T.ok : T.txt3, fontWeight:600, display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
+                                                                                    {shapLabel} 
+                                                                                    <span style={{ color:T.txt3, fontWeight:400 }}>(SHAP {isPos?'+':''}{shapValue})</span>
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -1445,9 +1449,9 @@ const Dashboard = () => {
                                                         
                                                         {/* --- SHAP Context inside Modal --- */}
                                                         {isTop && topF.contribution !== null && (
-                                                            <div style={{ fontSize:10, color: isPos ? T.crit : T.ok, fontWeight:600, marginTop:6, display:'flex', alignItems:'center', gap:3 }}>
-                                                                {isPos ? '▲ Risk UP' : '▼ Risk DOWN'}
-                                                                <span style={{color:T.txt3, fontWeight:400}}>(SHAP {isPos?'+':''}{topF.contribution.toFixed(2)})</span>
+                                                            <div style={{ fontSize:10, color: topF.contribution > 0 ? T.crit : topF.contribution < 0 ? T.ok : T.txt3, fontWeight:600, marginTop:6, display:'flex', alignItems:'center', gap:3 }}>
+                                                                {topF.contribution > 0 ? '▲ Risk UP' : topF.contribution < 0 ? '▼ Risk DOWN' : '• Neutral Impact'}
+                                                                <span style={{color:T.txt3, fontWeight:400}}>(SHAP {topF.contribution > 0 ? '+' : ''}{String(topF.contribution)})</span>
                                                             </div>
                                                         )}
                                                         

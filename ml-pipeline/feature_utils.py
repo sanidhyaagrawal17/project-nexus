@@ -50,6 +50,15 @@ def detect_id_column(df: pd.DataFrame):
     return None
 
 
+def _normalize_numeric_text(value):
+    if isinstance(value, str):
+        text = value.strip()
+        while len(text) >= 2 and ((text.startswith('[') and text.endswith(']')) or (text.startswith('(') and text.endswith(')'))):
+            text = text[1:-1].strip()
+        return text.replace(',', '')
+    return value
+
+
 def to_numeric_frame(df: pd.DataFrame, exclude=None) -> pd.DataFrame:
     """Force every non-excluded column into a numeric representation."""
     exclude = set(exclude or [])
@@ -57,7 +66,7 @@ def to_numeric_frame(df: pd.DataFrame, exclude=None) -> pd.DataFrame:
     for column in numeric.columns:
         if column in exclude:
             continue
-        numeric[column] = pd.to_numeric(numeric[column], errors='coerce')
+        numeric[column] = pd.to_numeric(numeric[column].map(_normalize_numeric_text), errors='coerce')
     return numeric.fillna(0.0)
 
 
@@ -184,7 +193,7 @@ def prepare_dataframe(df: pd.DataFrame, target_col: str = TARGET_COL):
 
     y = None
     if target_col in df.columns:
-        y = pd.to_numeric(df[target_col], errors='coerce').dropna().astype(int)
+        y = pd.to_numeric(df[target_col].map(_normalize_numeric_text), errors='coerce').dropna().astype(int)
         df = df.loc[y.index].copy()
 
     exclude_cols = [target_col]

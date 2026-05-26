@@ -122,8 +122,8 @@ def _format_shap_alert_row(feature_names, shap_row, feature_row, top_n=5):
     for name, contribution, raw_value in zip(feature_names, shap_row, feature_row):
         impacts.append({
             'name': name,
-            'raw': float(round(raw_value, 4)),
-            'contribution': float(round(contribution, 4)),
+            'raw': float(raw_value),
+            'contribution': float(contribution),
             'direction': 'UP' if contribution >= 0 else 'DOWN',
         })
     impacts.sort(key=lambda item: abs(item['contribution']), reverse=True)
@@ -349,6 +349,10 @@ def run_nexus_pipeline():
         'droppedFeatures': dropped_features,
         'featureCount': int(X.shape[1]),
         'engineeredFeatureCount': int(len(metadata['feature_columns']) - X.shape[1]),
+        'evaluation': {
+            'yTrue': [int(value) for value in y_test.tolist()],
+            'yProbabilities': [float(value) for value in test_probabilities.tolist()],
+        },
     })
 
     print('[*] Feature engineering, calibration, and evaluation artifacts saved.')

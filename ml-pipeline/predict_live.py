@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from feature_utils import align_features, clean_column_names, prepare_dataframe, save_json
+from feature_utils import align_features, clean_column_names, prepare_dataframe, save_json, to_numeric_frame
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -108,12 +108,14 @@ def run_live_inference(input_csv):
         feature_columns = list(X_base.columns)
 
     X_live = align_features(X_base, feature_columns)
+    X_live = to_numeric_frame(X_live)
     raw_anomaly = iso_forest.decision_function(X_live)
     min_a, max_a = np.min(raw_anomaly), np.max(raw_anomaly)
     scaled_anomaly = ((raw_anomaly - min_a) / (max_a - min_a)) * 100 if max_a > min_a else np.zeros(len(raw_anomaly))
 
     X_live['Anomaly_Score'] = scaled_anomaly
     X_live = align_features(X_live, feature_columns + ['Anomaly_Score'])
+    X_live = to_numeric_frame(X_live)
 
     predict_proba = calibrated_model.predict_proba(X_live)[:, 1]
 
