@@ -3,6 +3,11 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 let retrainJob = null;
+let activeRetrainProcess = null;
+
+function resolvePythonCommand() {
+    return process.env.PYTHON_CMD || process.env.PYTHON_EXECUTABLE || 'python3';
+}
 
 function startRetrainScheduler() {
     if (retrainJob) {
@@ -11,35 +16,37 @@ function startRetrainScheduler() {
 
     retrainJob = cron.schedule('0 2 * * 0', () => {
         const scriptPath = path.join(__dirname, '../ml-pipeline/retrain_cron.py');
-        const pythonExecutable = process.env.PYTHON_EXECUTABLE || 'python';
+        const pythonExecutable = resolvePythonCommand();
 
         console.log('[scheduler] Retraining job started.');
 
-        const child = spawn(pythonExecutable, [scriptPath], {
+        activeRetrainProcess = spawn(pythonExecutable, [scriptPath], {
             cwd: path.join(__dirname, '..'),
             env: process.env,
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true,
         });
 
-        child.stdout.on('data', (data) => {
+        activeRetrainProcess.stdout.on('data', (data) => {
             process.stdout.write(`[retrain stdout] ${data.toString()}`);
         });
 
-        child.stderr.on('data', (data) => {
+        activeRetrainProcess.stderr.on('data', (data) => {
             process.stderr.write(`[retrain stderr] ${data.toString()}`);
         });
 
-        child.on('error', (error) => {
+        activeRetrainProcess.on('error', (error) => {
             console.error('[scheduler] Failed to spawn retraining process:', error);
+            activeRetrainProcess = null;
         });
 
-        child.on('close', (code) => {
+        activeRetrainProcess.on('close', (code) => {
             if (code === 0) {
                 console.log('[scheduler] Retraining job completed successfully.');
             } else {
                 console.error(`[scheduler] Retraining job exited with code ${code}.`);
             }
+            activeRetrainProcess = null;
         });
     }, {
         scheduled: true,
@@ -49,4 +56,20 @@ function startRetrainScheduler() {
     return retrainJob;
 }
 
-module.exports = { startRetrainScheduler };
+function stopRetrainScheduler() {
+    if (retrainJob) {
+        retrainJob.stop();
+        retrainJob = null;
+    }
+
+    if (activeRetrainProcess && !activeRetrainProcess.killed) {
+        activeRetrainProcess.kill('SIGTERM');
+        setTimeout(() => {
+            if (activeRetrainProcess && !activeRetrainProcess.killed) {
+                activeRetrainProcess.kill('SIGKILL');
+            }
+        }, 5000).unref?.();
+    }
+}
+
+module.exports = { startRetrainScheduler, stopRetrainScheduler };

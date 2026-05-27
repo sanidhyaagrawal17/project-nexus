@@ -16,7 +16,7 @@ const Alert = require('./models/Alert');
 const ProcessedFile = require('./models/ProcessedFile');
 const ActivityLog = require('./models/ActivityLog');
 const AnalystFeedback = require('./models/AnalystFeedback');
-const { startRetrainScheduler } = require('./scheduler');
+const { startRetrainScheduler, stopRetrainScheduler } = require('./scheduler');
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT || '5000', 10);
@@ -59,6 +59,7 @@ const mongoUri = process.env.MONGO_URI;
 let currentEngineStatus = 'Idle';
 let _lastEngineEmit = { msg: '', at: 0 };
 let dbReady = false;
+let shuttingDown = false;
 
 const simpleRateBuckets = new Map();
 
@@ -103,6 +104,34 @@ function emitEngineProgress(status) {
         }
     } catch (e) { console.error('[!] emitEngineProgress failed', e); }
 }
+
+async function shutdown(signal) {
+    if (shuttingDown) {
+        return;
+    }
+
+    shuttingDown = true;
+    console.log(` [!] Received ${signal}; shutting down gracefully...`);
+    stopRetrainScheduler();
+
+    try {
+        await new Promise((resolve) => server.close(resolve));
+        await mongoose.connection.close();
+        console.log(' [+] MongoDB connection closed. Shutdown complete.');
+        process.exit(0);
+    } catch (error) {
+        console.error(' [!] Graceful shutdown failed:', error);
+        process.exit(1);
+    }
+}
+
+process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+});
+
+process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+});
 
 const metricsPath = path.join(__dirname, '../ml-pipeline/outputs/model_metrics.json');
 
