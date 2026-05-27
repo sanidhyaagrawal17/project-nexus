@@ -16,4 +16,4 @@ RUN python -m venv "$VIRTUAL_ENV" \
 
 COPY . .
 
-CMD ["sleep", "infinity"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

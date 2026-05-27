@@ -32,4 +32,6 @@ const alertSchema = new mongoose.Schema({
     detectedAt: { type: Date, default: Date.now } 
 });
 
+alertSchema.index({ accountId: 1 });
+
 module.exports = mongoose.model('Alert', alertSchema);

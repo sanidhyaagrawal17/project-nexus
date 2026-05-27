@@ -8,4 +8,6 @@ const processedFileSchema = new mongoose.Schema({
     processedAt: { type: Date, default: Date.now }
 });
 
+processedFileSchema.index({ fileHash: 1 });
+
 module.exports = mongoose.model('ProcessedFile', processedFileSchema);
