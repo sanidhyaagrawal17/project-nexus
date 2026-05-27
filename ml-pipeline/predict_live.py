@@ -52,9 +52,10 @@ def _load_dataframe(input_csv):
 def _structured_top_features(feature_names, shap_row, feature_row, top_n=5):
     impacts = []
     for name, contribution, raw_value in zip(feature_names, shap_row, feature_row):
+        numeric_raw = pd.to_numeric(pd.Series([raw_value]), errors='coerce').iloc[0]
         impacts.append({
             'name': name,
-            'raw': float(round(raw_value, 4)),
+            'raw': float(round(float(numeric_raw) if pd.notna(numeric_raw) else 0.0, 4)),
             'contribution': float(round(contribution, 4)),
             'direction': 'UP' if contribution >= 0 else 'DOWN',
         })
@@ -62,12 +63,13 @@ def _structured_top_features(feature_names, shap_row, feature_row, top_n=5):
     return impacts[:top_n]
 
 
-def export_alerts_to_json(X_live, predict_proba, scaled_anomaly, account_ids, output_path, total_scanned, shap_values, feature_names, thresholds):
+def export_alerts_to_json(X_live, predict_proba, scaled_anomaly, account_ids, output_path, total_scanned, alert_indices, shap_values, feature_names, thresholds):
     alerts = []
     alert_threshold = thresholds['alert_threshold']
     critical_threshold = thresholds['critical_threshold']
 
-    for index, probability in enumerate(predict_proba):
+    for alert_position, index in enumerate(alert_indices):
+        probability = predict_proba[index]
         if probability >= alert_threshold:
             risk_score = float(round(probability * 100, 2))
             anomaly_score = float(round(scaled_anomaly[index], 1))
@@ -78,7 +80,7 @@ def export_alerts_to_json(X_live, predict_proba, scaled_anomaly, account_ids, ou
                 'accountId': str(account_ids[index]),
                 'riskScore': risk_score,
                 'anomalyScore': anomaly_score,
-                'topFeatures': _structured_top_features(feature_names, shap_values[index], X_live.iloc[index]),
+                'topFeatures': _structured_top_features(feature_names, shap_values[alert_position], X_live.iloc[index]),
                 'rawTelemetry': row_data,
                 'status': status,
             })
@@ -118,16 +120,22 @@ def run_live_inference(input_csv):
     X_live = to_numeric_frame(X_live)
 
     predict_proba = calibrated_model.predict_proba(X_live)[:, 1]
+    alert_indices = np.flatnonzero(predict_proba >= thresholds['alert_threshold'])
 
-    print('[*] Generating SHAP local explainability matrices...')
-    try:
-        explainer = shap.TreeExplainer(raw_model)
-        shap_values = explainer.shap_values(X_live)
-        if isinstance(shap_values, list):
-            shap_values = shap_values[1]
-    except Exception as exc:
-        print(f'[!] SHAP explainability fallback engaged: {exc}')
-        shap_values = np.zeros((len(X_live), X_live.shape[1]))
+    if len(alert_indices) > 0:
+        print(f'[*] Generating SHAP local explainability matrices for {len(alert_indices)} alert rows...')
+        X_alert = X_live.iloc[alert_indices]
+        try:
+            explainer = shap.TreeExplainer(raw_model)
+            shap_values = explainer.shap_values(X_alert)
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]
+        except Exception as exc:
+            print(f'[!] SHAP explainability fallback engaged: {exc}')
+            shap_values = np.zeros((len(X_alert), X_alert.shape[1]))
+    else:
+        print('[*] No alerts met the threshold; skipping SHAP explainability pass.')
+        shap_values = np.zeros((0, X_live.shape[1]))
 
     export_alerts_to_json(
         X_live,
@@ -136,6 +144,7 @@ def run_live_inference(input_csv):
         account_ids,
         output_json_path,
         len(df),
+        alert_indices,
         shap_values,
         X_live.columns,
         thresholds,

@@ -1,0 +1,75 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27018:27017"
+    volumes:
+      - nexus-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/nexusDB
+      ML_PYTHON_EXECUTABLE: python3
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      MAX_JSON_BODY_SIZE: 100mb
+      MAX_URLENCODED_BODY_SIZE: 100mb
+      MAX_UPLOAD_SIZE_MB: 100
+    volumes:
+      - ./ml-pipeline:/app/ml-pipeline
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://localhost:5000/readyz',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ml-pipeline:
+    build:
+      context: ./ml-pipeline
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongodb:27017/nexusDB
+    volumes:
+      - ./ml-pipeline:/app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+volumes:
+  nexus-mongo-data:

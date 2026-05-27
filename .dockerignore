@@ -1,0 +1,14 @@
+.git
+.vscode
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+**/*.log
+backend/node_modules
+frontend/node_modules
+frontend/dist
+ml-pipeline/data
+ml-pipeline/models
+ml-pipeline/outputs
+ml-pipeline/.venv
+ml-pipeline/venv

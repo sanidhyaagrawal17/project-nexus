@@ -25,7 +25,89 @@ const T = {
     okBg:     '#0d1f16',
 };
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const UPLOAD_STATUS_COPY = {
+    idle: {
+        label: 'Idle',
+        detail: 'Waiting for a CSV upload.',
+        kind: 'idle',
+        phase: 0,
+    },
+    'uploading file...': {
+        label: 'Uploading',
+        detail: 'Sending the CSV to the backend.',
+        kind: 'active',
+        phase: 0,
+    },
+    'hashing file for deduplication check...': {
+        label: 'Hashing',
+        detail: 'Checking whether this dataset was already processed.',
+        kind: 'active',
+        phase: 1,
+    },
+    'initializing nexus ml engine...': {
+        label: 'Scoring',
+        detail: 'Launching the inference engine and preparing features.',
+        kind: 'active',
+        phase: 2,
+    },
+    'committing to nosql database...': {
+        label: 'Committing',
+        detail: 'Writing alerts and file metadata into MongoDB.',
+        kind: 'active',
+        phase: 3,
+    },
+    complete: {
+        label: 'Complete',
+        detail: 'The scan finished and the dashboard is refreshed.',
+        kind: 'done',
+        phase: 4,
+    },
+    'duplicate rejected': {
+        label: 'Duplicate Rejected',
+        detail: 'The uploaded dataset hash already exists.',
+        kind: 'error',
+        phase: 4,
+    },
+    'engine failure': {
+        label: 'Engine Failure',
+        detail: 'The inference process stopped unexpectedly.',
+        kind: 'error',
+        phase: 4,
+    },
+    'database error': {
+        label: 'Database Error',
+        detail: 'The results could not be saved to MongoDB.',
+        kind: 'error',
+        phase: 4,
+    },
+};
+
+const UPLOAD_PROGRESS_STEPS = [
+    { label: 'Upload' },
+    { label: 'Hash' },
+    { label: 'Score' },
+    { label: 'Commit' },
+    { label: 'Done' },
+];
+
+const getUploadStatusMeta = (status) => {
+    const normalized = String(status || 'Idle').trim().toLowerCase();
+    return UPLOAD_STATUS_COPY[normalized] || {
+        label: status || 'Idle',
+        detail: 'Processing the current file.',
+        kind: 'active',
+        phase: 2,
+    };
+};
+
+const formatDuration = (seconds) => {
+    const safeSeconds = Math.max(0, Math.floor(seconds || 0));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainder = safeSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+};
 
 const sampleDatasets = [
     {
@@ -307,6 +389,9 @@ const Dashboard = () => {
     const [loading, setLoading]                     = useState(true);
     const [isUploading, setIsUploading]             = useState(false);
     const [engineStatus, setEngineStatus]           = useState('Idle');
+    const [uploadStartedAt, setUploadStartedAt]     = useState(null);
+    const [uploadFileName, setUploadFileName]       = useState('');
+    const [uploadElapsedSeconds, setUploadElapsedSeconds] = useState(0);
     const [currentView, setCurrentView]             = useState('OVERVIEW');
     const [activeTab, setActiveTab]                 = useState('ALL');
     const [activeLogTab, setActiveLogTab]           = useState('ALL');
@@ -327,6 +412,22 @@ const Dashboard = () => {
     const itemsPerPage   = 12;
     const fileInputRef   = useRef(null);
     const statusInterval = useRef(null);
+    const socketRefLocal = useRef(null);
+
+    const statusMeta = getUploadStatusMeta(engineStatus);
+
+    useEffect(() => {
+        if (!isUploading || !uploadStartedAt) {
+            setUploadElapsedSeconds(0);
+            return undefined;
+        }
+
+        const timer = setInterval(() => {
+            setUploadElapsedSeconds(Math.floor((Date.now() - uploadStartedAt) / 1000));
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [isUploading, uploadStartedAt]);
 
     const fetchJson = async (endpoint, init) => {
         const response = await fetch(`${API_BASE}${endpoint}`, init);
@@ -360,6 +461,7 @@ const Dashboard = () => {
 
     useEffect(() => {
         const socket = io(API_BASE);
+        const socketRef = socketRefLocal;
         const alarm  = new Audio('/siren.mp3');
         socket.on('SCAN_COMPLETE', (data) => {
             alarm.play().catch(() => {});
@@ -384,21 +486,66 @@ const Dashboard = () => {
         });
         socket.on('SILENT_REFRESH', () => { fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
+        socket.on('ENGINE_PROGRESS', (payload) => {
+            try {
+                if (payload && payload.status) {
+                    setEngineStatus(payload.status);
+                    // If engine reports any terminal state, clear uploading state and refresh
+                    const terminal = ['Complete', 'Duplicate Rejected', 'Engine Failure', 'Database Error'];
+                    if (terminal.includes(payload.status)) {
+                        setIsUploading(false);
+                        if (statusInterval.current) { clearInterval(statusInterval.current); statusInterval.current = null; }
+                        fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+                    }
+                }
+            } catch (e) {}
+        });
         fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
-        return () => socket.disconnect();
+        socketRefLocal.current = socket;
+        return () => { socket.disconnect(); socketRefLocal.current = null; };
     }, []);
 
     useEffect(() => { setCurrentPage(1); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset]);
 
     const startStatusTracking = () => {
+        // If we have a socket connection that emits ENGINE_PROGRESS, prefer that over polling
+        if (socketRefLocal.current) return;
+        const terminalStatuses = new Set(['Complete', 'Duplicate Rejected', 'Engine Failure', 'Database Error']);
+        if (statusInterval.current) clearInterval(statusInterval.current);
         statusInterval.current = setInterval(async () => {
             try {
                 const data = await fetchJson('/api/status');
-                if (data) setEngineStatus(data.status);
+                if (data) {
+                    setEngineStatus(data.status);
+                    if (terminalStatuses.has(data.status)) {
+                        clearInterval(statusInterval.current);
+                        statusInterval.current = null;
+                        setIsUploading(false);
+                        setUploadStartedAt(null);
+                        fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+
+                        if (data.status === 'Complete') {
+                            toast.success(`Finished processing ${uploadFileName || 'the upload'}.`, {
+                                style:{ background:T.raised, color:T.ok, border:`1px solid #163028` },
+                                duration: 6000,
+                            });
+                        } else if (data.status === 'Duplicate Rejected') {
+                            toast.error('Duplicate upload blocked by hash check.', {
+                                style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` },
+                                duration: 6000,
+                            });
+                        } else if (data.status === 'Engine Failure' || data.status === 'Database Error') {
+                            toast.error(`Processing ended with ${data.status.toLowerCase()}.`, {
+                                style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` },
+                                duration: 6000,
+                            });
+                        }
+                    }
+                }
             } catch {}
         }, 300);
     };
-    const stopStatusTracking = () => { if (statusInterval.current) clearInterval(statusInterval.current); setEngineStatus('Idle'); };
+    const stopStatusTracking = () => { if (statusInterval.current) clearInterval(statusInterval.current); statusInterval.current = null; setEngineStatus('Idle'); setUploadStartedAt(null); setUploadElapsedSeconds(0); };
 
     const handleSystemWipe = async () => {
         if (!window.confirm('WARNING: This will delete all alerts, file histories, and logs from MongoDB. Proceed?')) return;
@@ -412,22 +559,36 @@ const Dashboard = () => {
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        setIsUploading(true); startStatusTracking();
+        setIsUploading(true);
+        setEngineStatus('Uploading file...');
+        setUploadFileName(file.name);
+        setUploadStartedAt(Date.now());
+        setUploadElapsedSeconds(0);
+        startStatusTracking();
+        const uploadToastId = toast.loading(`Uploading ${file.name} and verifying the dataset hash...`, {
+            style:{ background:T.raised, color:T.txt1, border:`1px solid ${T.borderHi}` },
+        });
         const fd = new FormData(); fd.append('telemetryFile', file);
+        let uploadAccepted = false;
         try {
             const res = await fetch(`${API_BASE}/api/upload`, { method:'POST', body:fd });
             const data = await res.json();
             if (!res.ok) {
                 if (data.message === 'DUPLICATE_FILE') {
-                    toast.error('Data Replay Blocked — dataset hash already exists.', { style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` }, duration:6000 });
+                    toast.error('Data Replay Blocked — dataset hash already exists.', { id: uploadToastId, style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` }, duration:6000 });
                 } else throw new Error(data.message || 'Failed to process CSV');
             } else {
+                uploadAccepted = true;
                 setResolvedIds(new Set()); setCurrentPage(1); setActiveDataset(file.name); setCurrentView('OVERVIEW');
+                toast.success(`Upload accepted. ${file.name} is now being scored in the background.`, { id: uploadToastId, style:{ background:T.raised, color:T.ok, border:`1px solid #163028` } });
             }
         } catch (err) {
-            toast.error(`Upload Error: ${err.message}`, { style:{ background:T.raised, color:T.crit } });
+            toast.error(`Upload Error: ${err.message}`, { id: uploadToastId, style:{ background:T.raised, color:T.crit } });
         } finally {
-            setIsUploading(false); stopStatusTracking();
+            if (!uploadAccepted) {
+                setIsUploading(false); stopStatusTracking();
+                setUploadFileName('');
+            }
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -565,6 +726,8 @@ const Dashboard = () => {
     );
 
     const SBW = sidebarCollapsed ? 56 : 220;
+    const statusText = isUploading || statusMeta.kind !== 'idle' ? statusMeta.label : 'Engine Idle';
+    const statusTone = statusMeta.kind === 'error' ? T.crit : statusMeta.kind === 'done' ? T.ok : isUploading ? T.accent : T.ok;
 
     return (
         <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:T.bg,
@@ -675,11 +838,11 @@ const Dashboard = () => {
                 <div style={{ padding: sidebarCollapsed ? '12px 0' : '12px 14px', borderTop:`1px solid ${T.border}`,
                     display:'flex', alignItems:'center', gap:8, justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
                     <div style={{ width:7, height:7, borderRadius:'50%', flexShrink:0,
-                        background: isUploading ? T.crit : T.ok }} />
+                        background: statusTone }} />
                     {!sidebarCollapsed && (
                         <span style={{ fontSize:11, color:T.txt3, fontFamily:'monospace', overflow:'hidden',
                             textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {isUploading ? engineStatus : 'Engine Idle'}
+                            {statusText}
                         </span>
                     )}
                 </div>
@@ -734,6 +897,55 @@ const Dashboard = () => {
                         Ingest Data
                     </button>
                 </header>
+
+                {isUploading && (
+                    <div style={{ padding:'16px 20px 0 20px' }}>
+                        <Card style={{ padding:'14px 16px', border:`1px solid ${T.borderHi}`, background:`linear-gradient(135deg, ${T.raised} 0%, #17191f 100%)` }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', gap:14, flexWrap:'wrap', alignItems:'flex-start' }}>
+                                <div style={{ minWidth: 240 }}>
+                                    <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:6 }}>Live Upload</div>
+                                    <div style={{ fontSize:15, color:T.txt1, fontWeight:700, marginBottom:4, fontFamily:'monospace' }}>
+                                        {uploadFileName || 'Current dataset'}
+                                    </div>
+                                    <div style={{ fontSize:12, color:T.txt2, lineHeight:1.5 }}>
+                                        {statusMeta.detail}
+                                    </div>
+                                </div>
+
+                                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                                    <div style={{ padding:'8px 12px', borderRadius:8, background:T.bg, border:`1px solid ${T.borderHi}` }}>
+                                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em' }}>Status</div>
+                                        <div style={{ fontSize:12, color:statusTone, fontWeight:700, marginTop:2 }}>{statusText}</div>
+                                    </div>
+                                    <div style={{ padding:'8px 12px', borderRadius:8, background:T.bg, border:`1px solid ${T.borderHi}` }}>
+                                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em' }}>Elapsed</div>
+                                        <div style={{ fontSize:12, color:T.txt1, fontWeight:700, marginTop:2 }}>{formatDuration(uploadElapsedSeconds)}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop:14, display:'grid', gridTemplateColumns:'repeat(5, minmax(0, 1fr))', gap:8 }}>
+                                {UPLOAD_PROGRESS_STEPS.map((step, idx) => {
+                                    const completed = idx < statusMeta.phase;
+                                    const active = idx === statusMeta.phase;
+                                    const terminal = idx === 4 && statusMeta.kind !== 'active' && statusMeta.kind !== 'idle';
+                                    const stepBg = terminal && statusMeta.kind === 'error' ? T.critBg : completed || active || terminal ? T.accentBg : T.bg;
+                                    const stepBorder = terminal && statusMeta.kind === 'error' ? T.critBdr : completed || active || terminal ? T.borderHi : T.border;
+                                    const stepColor = terminal && statusMeta.kind === 'error' ? T.crit : completed || active || terminal ? T.txt1 : T.txt3;
+
+                                    return (
+                                        <div key={step.label} style={{ padding:'8px 10px', borderRadius:8, background:stepBg, border:`1px solid ${stepBorder}` }}>
+                                            <div style={{ fontSize:9, color:stepColor, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:2 }}>
+                                                {String(idx + 1).padStart(2, '0')}
+                                            </div>
+                                            <div style={{ fontSize:12, color:stepColor, fontWeight:700 }}>{step.label}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Scrollable content area */}
                 <main style={{ flex:1, overflowY:'auto', padding:20 }}>
