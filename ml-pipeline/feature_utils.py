@@ -262,9 +262,10 @@ def optimize_threshold(y_true, y_prob):
             best_fbeta = float(fbeta)
             best_precision = float(precision)
             best_recall = float(recall)
-    critical_threshold = min(0.99, max(best_threshold + 0.12, 0.95))
+    alert_threshold = min(float(round(best_threshold, 2)), 0.98)
+    critical_threshold = min(0.99, max(float(round(best_threshold + 0.12, 2)), 0.95, alert_threshold + 0.01))
     return {
-        'alert_threshold': float(round(best_threshold, 2)),
+        'alert_threshold': alert_threshold,
         'critical_threshold': float(round(critical_threshold, 2)),
         'best_fbeta': float(best_fbeta),
         'best_f1': float(best_fbeta),  # Legacy compatibility alias.

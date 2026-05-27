@@ -5,10 +5,6 @@ const { spawn } = require('child_process');
 let retrainJob = null;
 let activeRetrainProcess = null;
 
-function resolvePythonCommand() {
-    return process.env.PYTHON_CMD || process.env.PYTHON_EXECUTABLE || 'python3';
-}
-
 function startRetrainScheduler() {
     if (retrainJob) {
         return retrainJob;
@@ -16,7 +12,7 @@ function startRetrainScheduler() {
 
     retrainJob = cron.schedule('0 2 * * 0', () => {
         const scriptPath = path.join(__dirname, '../ml-pipeline/retrain_cron.py');
-        const pythonExecutable = resolvePythonCommand();
+        const pythonExecutable = process.env.PYTHON_EXECUTABLE || 'python3';
 
         console.log('[scheduler] Retraining job started.');
 

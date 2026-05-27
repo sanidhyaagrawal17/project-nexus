@@ -21,21 +21,24 @@ Then open:
 - Backend: http://localhost:5000/healthz
 - Backend readiness: http://localhost:5000/readyz
 
-## Environment variables
+## Configuration
 
 Backend:
 
-- `MONGO_URI`
-- `PORT`
-- `ML_PYTHON_EXECUTABLE`
-- `CORS_ORIGINS`
-- `MAX_JSON_BODY_SIZE`
-- `MAX_URLENCODED_BODY_SIZE`
-- `MAX_UPLOAD_SIZE_MB`
+- `MONGO_URI`: MongoDB connection string used by the backend and ML pipeline.
+- `PYTHON_EXECUTABLE`: Python executable used by the retraining scheduler.
+- `PORT`: Backend HTTP port.
+- `CORS_ORIGINS`: Comma-separated list of allowed frontend origins.
 
 Frontend build:
 
-- `VITE_API_URL`
+- `VITE_API_URL`: API base URL embedded into the frontend build.
+
+### Database Setup & Indexing
+
+Before running the backend for the first time, initialize the database indexes by running: `node backend/scripts/init_db.js`.
+
+If you are running the application outside Docker, set `MONGO_URI` and `PYTHON_EXECUTABLE` in your environment or `.env` file before starting the backend.
 
 ## Notes
 

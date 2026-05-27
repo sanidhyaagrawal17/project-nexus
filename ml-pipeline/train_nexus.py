@@ -10,7 +10,7 @@ from imblearn.over_sampling import SMOTE
 from sklearn.ensemble import IsolationForest
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from xgboost import DMatrix, XGBClassifier
 
 from feature_utils import (
     clean_column_names,
@@ -21,6 +21,7 @@ from feature_utils import (
     prune_correlated_features,
     prepare_dataframe,
     save_json,
+    to_numeric_frame,
 )
 
 try:
@@ -117,17 +118,60 @@ def _load_dataframe(data_path):
         return pd.read_csv(data_path, encoding='latin1', low_memory=False)
 
 
+def _scale_anomaly_scores(scores, min_score=None, max_score=None):
+    scores = np.asarray(scores, dtype=float)
+    min_score = float(np.min(scores)) if min_score is None else float(min_score)
+    max_score = float(np.max(scores)) if max_score is None else float(max_score)
+    if max_score <= min_score:
+        return np.zeros(len(scores)), {'min': min_score, 'max': max_score}
+    scaled = ((scores - min_score) / (max_score - min_score)) * 100
+    return scaled, {'min': min_score, 'max': max_score}
+
+
 def _format_shap_alert_row(feature_names, shap_row, feature_row, top_n=5):
     impacts = []
     for name, contribution, raw_value in zip(feature_names, shap_row, feature_row):
+        numeric_raw = pd.to_numeric(pd.Series([raw_value]), errors='coerce').iloc[0]
+        safe_raw = float(numeric_raw) if pd.notna(numeric_raw) else 0.0
+        contribution = float(contribution)
         impacts.append({
             'name': name,
-            'raw': float(raw_value),
-            'contribution': float(contribution),
+            'raw': float(round(safe_raw, 4)),
+            'contribution': float(round(contribution, 4)),
             'direction': 'UP' if contribution >= 0 else 'DOWN',
         })
     impacts.sort(key=lambda item: abs(item['contribution']), reverse=True)
     return impacts[:top_n]
+
+
+def _extract_binary_shap_values(raw_values):
+    values = raw_values.values if hasattr(raw_values, 'values') else raw_values
+    if isinstance(values, list):
+        values = values[1] if len(values) > 1 else values[0]
+    values = np.asarray(values)
+    if values.ndim == 3:
+        values = values[:, :, 1] if values.shape[2] > 1 else values[:, :, 0]
+    return values
+
+
+def _compute_shap_values(model, frame):
+    explain_frame = to_numeric_frame(frame)
+    try:
+        explainer = shap.TreeExplainer(model)
+        shap_values = _extract_binary_shap_values(explainer.shap_values(explain_frame))
+    except Exception as exc:
+        print(f'[*] SHAP TreeExplainer parser skipped; using XGBoost native Tree SHAP contributions: {exc}')
+        contributions = model.get_booster().predict(
+            DMatrix(explain_frame, feature_names=list(explain_frame.columns)),
+            pred_contribs=True,
+        )
+        contributions = np.asarray(contributions)
+        if contributions.ndim == 3:
+            contributions = contributions[:, 1, :] if contributions.shape[1] > 1 else contributions[:, 0, :]
+        shap_values = contributions[:, :-1]
+    if shap_values.shape != explain_frame.shape:
+        raise ValueError(f'SHAP matrix shape {shap_values.shape} does not match feature matrix {explain_frame.shape}.')
+    return shap_values
 
 
 def export_alerts_to_json(X_test, predict_proba, anomaly_scores, account_ids, output_path, shap_values, feature_names, thresholds, metrics, feature_importances):
@@ -235,12 +279,26 @@ def run_nexus_pipeline():
     iso_forest = IsolationForest(contamination=0.01, random_state=42)
     iso_forest.fit(X_train)
 
+    train_anomaly_raw = iso_forest.decision_function(X_train)
+    train_anomaly_scaled, anomaly_scaler = _scale_anomaly_scores(train_anomaly_raw)
+    calib_anomaly_scaled, _ = _scale_anomaly_scores(
+        iso_forest.decision_function(X_calib),
+        anomaly_scaler['min'],
+        anomaly_scaler['max'],
+    )
+    test_anomaly_raw = iso_forest.decision_function(X_test)
+    test_anomaly_scaled, _ = _scale_anomaly_scores(
+        test_anomaly_raw,
+        anomaly_scaler['min'],
+        anomaly_scaler['max'],
+    )
+
     X_train_enhanced = X_train.copy()
-    X_train_enhanced['Anomaly_Score'] = iso_forest.decision_function(X_train)
+    X_train_enhanced['Anomaly_Score'] = train_anomaly_scaled
     X_calib_enhanced = X_calib.copy()
-    X_calib_enhanced['Anomaly_Score'] = iso_forest.decision_function(X_calib)
+    X_calib_enhanced['Anomaly_Score'] = calib_anomaly_scaled
     X_test_enhanced = X_test.copy()
-    X_test_enhanced['Anomaly_Score'] = iso_forest.decision_function(X_test)
+    X_test_enhanced['Anomaly_Score'] = test_anomaly_scaled
 
     print('\n[*] Phase 2: Balancing training data via SMOTE...')
     smote = SMOTE(random_state=42)
@@ -300,15 +358,12 @@ def run_nexus_pipeline():
 
     print('\n=== Generating Nexus Threat Assessment ===')
     try:
-        explainer = shap.TreeExplainer(xgb_model)
-        shap_values = explainer.shap_values(X_test_enhanced)
-        if isinstance(shap_values, list):
-            shap_values = shap_values[1]
+        shap_values = _compute_shap_values(xgb_model, X_test_enhanced)
     except Exception as exc:
         print(f'[!] SHAP explainability fallback engaged: {exc}')
         shap_values = np.zeros((len(X_test_enhanced), X_test_enhanced.shape[1]))
 
-    anomaly_scores = iso_forest.decision_function(X_test)
+    anomaly_scores = test_anomaly_scaled
     export_alerts_to_json(
         X_test_enhanced,
         test_probabilities,
@@ -330,6 +385,7 @@ def run_nexus_pipeline():
     joblib.dump(calibrated_model, os.path.join(model_dir, 'nexus_calibrated_model.pkl'))
     joblib.dump(list(X_train_enhanced.columns), os.path.join(model_dir, 'nexus_feature_schema.pkl'))
     joblib.dump(threshold_settings, os.path.join(model_dir, 'nexus_thresholds.pkl'))
+    joblib.dump(anomaly_scaler, os.path.join(model_dir, 'nexus_anomaly_scaler.pkl'))
 
     save_json(os.path.join(output_dir, 'model_metrics.json'), {
         'inputSchema': {
