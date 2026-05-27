@@ -8,7 +8,7 @@ const transactionSchema = new mongoose.Schema({
 }, { _id: false }); 
 
 const alertSchema = new mongoose.Schema({
-    accountId: { type: String, required: true },
+    accountId: { type: String, required: true, index: true },
     riskScore: { type: Number, required: true },
     anomalyScore: { type: Number, required: true },
     topFeatures: { type: [mongoose.Schema.Types.Mixed], default: [] },

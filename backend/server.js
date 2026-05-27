@@ -16,6 +16,7 @@ const Alert = require('./models/Alert');
 const ProcessedFile = require('./models/ProcessedFile');
 const ActivityLog = require('./models/ActivityLog');
 const AnalystFeedback = require('./models/AnalystFeedback');
+const { startRetrainScheduler } = require('./scheduler');
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT || '5000', 10);
@@ -353,6 +354,7 @@ async function bootstrap() {
 
         await mongoose.connect(mongoUri);
         console.log(' [+] Connected to Nexus NoSQL Database');
+        startRetrainScheduler();
         server.listen(PORT, () => console.log(` [+] Nexus Backend & WebSocket listening on port ${PORT}`));
     } catch (err) {
         console.error(' [!] Database Connection Error:', err);
