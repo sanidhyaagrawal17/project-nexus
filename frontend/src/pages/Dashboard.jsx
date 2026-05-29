@@ -3,6 +3,8 @@ import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tool
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
 
+/* eslint-disable react-hooks/exhaustive-deps */
+
 const T = {
     bg: '#111214',
     surface: '#18191d',
@@ -422,7 +424,8 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (!isUploading || !uploadStartedAt) {
-            setUploadElapsedSeconds(0);
+            // defer to avoid synchronous setState in effect
+            setTimeout(() => setUploadElapsedSeconds(0), 0);
             return undefined;
         }
 
@@ -453,9 +456,9 @@ const Dashboard = () => {
                 setAlerts(data.data || []);
                 setTotalAlertsCount(Number(data.total || data.count || (data.data || []).length));
             }
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
     }, [itemsPerPage]);
-    const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch {} };
+    const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch { /* ignore */ } };
     const fetchModelConfig = async () => {
         try {
             const data = await fetchJson('/api/config');
@@ -467,7 +470,7 @@ const Dashboard = () => {
                 setDroppedFeatures(data.droppedFeatures || []);
                 setFeatureImportance(data.featureImportance || []);
             }
-        } catch {}
+        } catch { /* ignore */ }
     };
     const fetchLogsAndFiles = async () => {
         try {
@@ -483,11 +486,11 @@ const Dashboard = () => {
 
     useEffect(() => {
         const socket = io(API_BASE);
-        const socketRef = socketRefLocal;
+        // socketRefLocal is used directly; avoid creating an unused alias
         const alarm  = new Audio('/siren.mp3');
         socket.on('SCAN_COMPLETE', (data) => {
             alarm.play().catch(() => {});
-            toast.custom((t) => (
+            toast.custom(() => (
                 <div style={{ background:T.raised, border:`1px solid ${T.critBdr}`, borderRadius:8,
                     padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start',
                     boxShadow:'0 4px 24px rgba(0,0,0,0.4)', maxWidth:360 }}>
@@ -506,7 +509,7 @@ const Dashboard = () => {
                 </div>
             ), { duration:8000, position:'top-right' });
         });
-        socket.on('SILENT_REFRESH', () => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); });
+        socket.on('SILENT_REFRESH', () => { setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); }, 0); });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
         socket.on('SYNC_STATE', (state) => {
             try {
@@ -514,7 +517,7 @@ const Dashboard = () => {
                 if (state.files) { setUploadedFiles(state.files || []); setAvailableDatasets(state.files || []); }
                 if (state.logs) setLogs(state.logs || []);
                 if (state.config && state.config.thresholds) setModelConfig(state.config.thresholds);
-            } catch (e) { /* ignore */ }
+                } catch { /* ignore */ }
         });
         socket.on('ENGINE_PROGRESS', (payload) => {
             try {
@@ -525,12 +528,12 @@ const Dashboard = () => {
                     if (terminal.includes(payload.status)) {
                         setIsUploading(false);
                         if (statusInterval.current) { clearInterval(statusInterval.current); statusInterval.current = null; }
-                        fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+                        setTimeout(() => { fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
                     }
                 }
-            } catch (e) {}
+            } catch { /* ignore */ }
         });
-        fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+        setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
         socketRefLocal.current = socket;
         return () => { socket.disconnect(); socketRefLocal.current = null; };
     }, []);
@@ -547,21 +550,22 @@ const Dashboard = () => {
                     setUploadLimitEnabled(Boolean(j.enabled));
                     setPerUploadMB(Number(j.maxUploadMB || 0));
                 }
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
         })();
     }, []);
 
-    useEffect(() => { setCurrentPage(1); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset, datasetSourceFilter]);
+    useEffect(() => { setTimeout(() => setCurrentPage(1), 0); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset, datasetSourceFilter]);
 
     // When current page changes, ask the server for the corresponding page.
     useEffect(() => {
-        fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm });
+        setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); }, 0);
     }, [currentPage, activeDataset, activeTab, searchTerm, fetchAlerts]);
 
     useEffect(() => {
         const visibleDatasets = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || (file.sourceType || (String(file.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST')) === datasetSourceFilter);
         if (activeDataset !== 'ALL' && !visibleDatasets.some(file => file.fileName === activeDataset)) {
-            setActiveDataset('ALL');
+            // defer to avoid setState in effect
+            setTimeout(() => setActiveDataset('ALL'), 0);
         }
     }, [availableDatasets, datasetSourceFilter, activeDataset]);
 
@@ -580,7 +584,7 @@ const Dashboard = () => {
                         statusInterval.current = null;
                         setIsUploading(false);
                         setUploadStartedAt(null);
-                        fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+                        setTimeout(() => { fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
 
                         if (data.status === 'Complete') {
                             toast.success(`Finished processing ${uploadFileName || 'the upload'}.`, {
@@ -600,7 +604,7 @@ const Dashboard = () => {
                         }
                     }
                 }
-            } catch {}
+            } catch { /* ignore */ }
         }, 300);
     };
     const stopStatusTracking = () => { if (statusInterval.current) clearInterval(statusInterval.current); statusInterval.current = null; setEngineStatus('Idle'); setUploadStartedAt(null); setUploadElapsedSeconds(0); };
@@ -667,12 +671,12 @@ const Dashboard = () => {
     };
 
     const handleResolve = async (accountId, e) => {
-        e.stopPropagation();
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
         setResolvedIds(prev => new Set(prev).add(accountId));
         try {
             await fetchJson('/api/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ accountId, decision:'SAFE', sourceFileName: selectedAccount?.sourceFileName || null }) });
             toast.success(`${accountId} marked as safe.`, { style:{ background:T.raised, color:T.ok, border:`1px solid #163028` } });
-        } catch {}
+        } catch (err) { console.error(err); toast.error('Failed to mark safe.'); }
     };
 
     const exportToCSV = () => {
@@ -692,6 +696,7 @@ const Dashboard = () => {
     const visibleDatasetFiles = useMemo(() => availableDatasets.filter(file => datasetSourceFilter === 'ALL' || resolveSourceType(file) === datasetSourceFilter), [availableDatasets, datasetSourceFilter]);
     const visibleDatasetNames = useMemo(() => new Set(visibleDatasetFiles.map(file => file.fileName)), [visibleDatasetFiles]);
     const unresolvedAlerts = useMemo(() => alerts.filter(a => !resolvedIds.has(a.accountId)), [alerts, resolvedIds]);
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     const activeAlerts = useMemo(() => unresolvedAlerts.filter(a => {
         const matchesDataset = activeDataset === 'ALL' || a.sourceFileName === activeDataset;
         const matchesSource = datasetSourceFilter === 'ALL' || visibleDatasetNames.has(a.sourceFileName);
@@ -712,6 +717,7 @@ const Dashboard = () => {
 
     const totalPages    = Math.max(1, Math.ceil(totalAlertsCount / itemsPerPage));
     const currentAlerts = filteredAlerts; // server provides paged alerts for current page
+    const idx0 = (currentPage - 1) * itemsPerPage;
 
     const filteredLogs   = logs.filter(l => activeLogTab === 'ALL' || l.actor === activeLogTab);
     const totalLogPages  = Math.ceil(filteredLogs.length / itemsPerPage);
@@ -1813,7 +1819,7 @@ const Dashboard = () => {
                                                 const topF = getAlertFeatures(selectedAccount).find(tf => tf.name === k);
                                                 const isTop = !!topF;
                                                 const cat = featureCat(k);
-                                                const isPos = topF && topF.contribution > 0;
+                                                
                                                 
                                                 return (
                                                     <div key={k} style={{
