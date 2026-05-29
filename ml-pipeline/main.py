@@ -33,6 +33,11 @@ class PredictRequest(BaseModel):
     output_path: Optional[str] = Field(default=None, description='Optional path for writing the JSON payload.')
 
 
+class StreamEventBatchRequest(BaseModel):
+    events: list[dict[str, Any]] = Field(..., min_length=1, description='Transaction events to aggregate and score.')
+    output_path: Optional[str] = Field(default=None, description='Optional path for writing the JSON payload.')
+
+
 def _load_models():
     model_dir = BASE_DIR / 'models'
 
@@ -49,6 +54,31 @@ def _load_models():
             calibrated_model = joblib.load(calibrated_path)
         except Exception:
             calibrated_model = raw_model
+
+        standby_model = None
+        standby_calibrated_model = None
+        standby_thresholds = None
+
+        standby_model_path = model_dir / 'nexus_xgboost_standby.pkl'
+        if standby_model_path.exists():
+            try:
+                standby_model = joblib.load(standby_model_path)
+            except Exception:
+                standby_model = None
+
+        standby_calibrated_path = model_dir / 'nexus_calibrated_model_standby.pkl'
+        if standby_calibrated_path.exists():
+            try:
+                standby_calibrated_model = joblib.load(standby_calibrated_path)
+            except Exception:
+                standby_calibrated_model = None
+
+        standby_thresholds_path = model_dir / 'nexus_thresholds_standby.pkl'
+        if standby_thresholds_path.exists():
+            try:
+                standby_thresholds = joblib.load(standby_thresholds_path)
+            except Exception:
+                standby_thresholds = None
 
     try:
         feature_schema = joblib.load(model_dir / 'nexus_feature_schema.pkl')
@@ -72,8 +102,11 @@ def _load_models():
         'iso_forest': iso_forest,
         'raw_model': raw_model,
         'calibrated_model': calibrated_model,
+        'standby_model': standby_model,
+        'standby_calibrated_model': standby_calibrated_model,
         'feature_schema': feature_schema,
         'thresholds': thresholds,
+        'standby_thresholds': standby_thresholds,
         'anomaly_scaler': anomaly_scaler,
     }
 
@@ -129,6 +162,60 @@ def _structured_top_features(feature_names, shap_row, feature_row, top_n=5):
     return impacts[:top_n]
 
 
+def _score_model_payload(model, X_live, anomaly_scores, account_ids, feature_names, thresholds, total_scanned, source_label='primary'):
+    predict_proba = model.predict_proba(X_live)[:, 1]
+    alert_indices = np.flatnonzero(predict_proba >= thresholds['alert_threshold'])
+
+    if len(alert_indices) > 0:
+        print(f'[*] Generating SHAP local explainability matrices for {len(alert_indices)} {source_label} alert rows...')
+        X_alert = X_live.iloc[alert_indices]
+        try:
+            shap_values = _compute_shap_values(model, X_alert)
+        except Exception as exc:
+            print(f'[!] {source_label.title()} SHAP explainability fallback engaged: {exc}')
+            shap_values = np.zeros((len(X_alert), X_alert.shape[1]))
+    else:
+        print(f'[*] No {source_label} alerts met the threshold; skipping SHAP explainability pass.')
+        shap_values = np.zeros((0, X_live.shape[1]))
+
+    alerts = []
+    critical_count = 0
+    high_risk_count = 0
+
+    for alert_position, index in enumerate(alert_indices):
+        probability = predict_proba[index]
+        risk_score = float(round(probability * 100, 2))
+        anomaly_score = float(round(anomaly_scores[index], 1))
+        status = 'Critical' if probability >= thresholds['critical_threshold'] else 'High Risk'
+        if status == 'Critical':
+            critical_count += 1
+        else:
+            high_risk_count += 1
+
+        alerts.append({
+            'accountId': str(account_ids[index]),
+            'riskScore': risk_score,
+            'anomalyScore': anomaly_score,
+            'topFeatures': _structured_top_features(feature_names, shap_values[alert_position], X_live.iloc[index]),
+            'rawTelemetry': X_live.iloc[index].to_dict(),
+            'status': status,
+        })
+
+    critical_share = len(alerts) and (critical_count / len(alerts)) or 0
+    return {
+        'success': True,
+        'totalScanned': int(total_scanned),
+        'count': len(alerts),
+        'thresholds': thresholds,
+        'data': alerts,
+        'guardrail': {
+            'criticalShare': critical_share,
+            'criticalCount': critical_count,
+            'highRiskCount': high_risk_count,
+        },
+    }
+
+
 def _extract_binary_shap_values(raw_values):
     values = raw_values.values if hasattr(raw_values, 'values') else raw_values
     if isinstance(values, list):
@@ -159,46 +246,10 @@ def _compute_shap_values(model, frame):
     return shap_values
 
 
-def _build_alert_payload(X_live, predict_proba, scaled_anomaly, account_ids, alert_indices, shap_values, feature_names, thresholds, total_scanned):
-    alerts = []
-    alert_threshold = thresholds['alert_threshold']
-    critical_threshold = thresholds['critical_threshold']
-
-    for alert_position, index in enumerate(alert_indices):
-        probability = predict_proba[index]
-        if probability >= alert_threshold:
-            risk_score = float(round(probability * 100, 2))
-            anomaly_score = float(round(scaled_anomaly[index], 1))
-            status = 'Critical' if probability >= critical_threshold else 'High Risk'
-            row_data = X_live.iloc[index].to_dict()
-
-            alerts.append({
-                'accountId': str(account_ids[index]),
-                'riskScore': risk_score,
-                'anomalyScore': anomaly_score,
-                'topFeatures': _structured_top_features(feature_names, shap_values[alert_position], X_live.iloc[index]),
-                'rawTelemetry': row_data,
-                'status': status,
-            })
-
-    return {
-        'success': True,
-        'totalScanned': int(total_scanned),
-        'count': len(alerts),
-        'thresholds': thresholds,
-        'data': alerts,
-    }
-
-
-def predict_from_csv_path(csv_path: str, output_path: str | Path | None = None):
+def _predict_from_dataframe(df: pd.DataFrame, output_path: str | Path | None = None, source_label: str = 'csv'):
     _ensure_model_state()
 
-    resolved_path = _resolve_input_path(csv_path)
-    if not resolved_path.exists():
-        raise FileNotFoundError(f'Input CSV not found: {resolved_path}')
-
-    print('\n=== Nexus Live Inference Engine ===')
-    df = _load_dataframe(resolved_path)
+    print(f'\n=== Nexus {source_label.title()} Inference Engine ===')
     df_clean = clean_column_names(df)
     X_base, _, _ = prepare_dataframe(df_clean)
 
@@ -218,36 +269,82 @@ def predict_from_csv_path(csv_path: str, output_path: str | Path | None = None):
     X_live = align_features(X_live, feature_columns + ['Anomaly_Score'])
     X_live = to_numeric_frame(X_live)
 
-    predict_proba = MODEL_STATE['calibrated_model'].predict_proba(X_live)[:, 1]
-    alert_indices = np.flatnonzero(predict_proba >= MODEL_STATE['thresholds']['alert_threshold'])
-
-    if len(alert_indices) > 0:
-        print(f'[*] Generating SHAP local explainability matrices for {len(alert_indices)} alert rows...')
-        X_alert = X_live.iloc[alert_indices]
-        try:
-            shap_values = _compute_shap_values(MODEL_STATE['raw_model'], X_alert)
-        except Exception as exc:
-            print(f'[!] SHAP explainability fallback engaged: {exc}')
-            shap_values = np.zeros((len(X_alert), X_alert.shape[1]))
-    else:
-        print('[*] No alerts met the threshold; skipping SHAP explainability pass.')
-        shap_values = np.zeros((0, X_live.shape[1]))
-
-    payload = _build_alert_payload(
+    primary_payload = _score_model_payload(
+        MODEL_STATE['calibrated_model'],
         X_live,
-        predict_proba,
         scaled_anomaly,
         account_ids,
-        alert_indices,
-        shap_values,
         X_live.columns,
         MODEL_STATE['thresholds'],
         len(df),
+        'primary',
     )
+
+    payload = primary_payload
+    standby_model = MODEL_STATE.get('standby_calibrated_model') or MODEL_STATE.get('standby_model')
+    standby_thresholds = MODEL_STATE.get('standby_thresholds') or MODEL_STATE['thresholds']
+
+    max_critical_share = float(os.getenv('NEXUS_MAX_CRITICAL_SHARE', '0.25'))
+    primary_critical_share = primary_payload['guardrail']['criticalShare']
+    standby_payload = None
+
+    if standby_model is not None and primary_critical_share > max_critical_share:
+        standby_payload = _score_model_payload(
+            standby_model,
+            X_live,
+            scaled_anomaly,
+            account_ids,
+            X_live.columns,
+            standby_thresholds,
+            len(df),
+            'standby',
+        )
+
+        if standby_payload['guardrail']['criticalShare'] <= primary_critical_share:
+            payload = standby_payload
+            payload['deploymentMode'] = 'STANDBY'
+            payload['guardrail'] = {
+                **payload['guardrail'],
+                'primaryCriticalShare': primary_critical_share,
+                'standbyActivated': True,
+            }
+        else:
+            payload = primary_payload
+            payload['deploymentMode'] = 'PRIMARY'
+            payload['guardrail'] = {
+                **payload['guardrail'],
+                'primaryCriticalShare': primary_critical_share,
+                'standbyActivated': False,
+                'standbyCriticalShare': standby_payload['guardrail']['criticalShare'],
+            }
+    else:
+        payload['deploymentMode'] = 'PRIMARY'
+        payload['guardrail'] = {
+            **payload['guardrail'],
+            'primaryCriticalShare': primary_critical_share,
+            'standbyActivated': False,
+        }
 
     resolved_output_path = Path(output_path) if output_path else DEFAULT_OUTPUT_PATH
     save_json(str(resolved_output_path), payload)
     return payload
+
+
+def predict_from_csv_path(csv_path: str, output_path: str | Path | None = None):
+    resolved_path = _resolve_input_path(csv_path)
+    if not resolved_path.exists():
+        raise FileNotFoundError(f'Input CSV not found: {resolved_path}')
+
+    df = _load_dataframe(resolved_path)
+    return _predict_from_dataframe(df, output_path=output_path, source_label='csv')
+
+
+def predict_from_live_events(events, output_path: str | Path | None = None):
+    df = pd.DataFrame(events)
+    if df.empty:
+        raise ValueError('Live stream batch did not contain any events.')
+
+    return _predict_from_dataframe(df, output_path=output_path, source_label='live stream')
 
 
 @app.on_event('startup')
@@ -266,6 +363,16 @@ def predict(request: PredictRequest):
         return predict_from_csv_path(request.csv_path, request.output_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post('/predict_stream_batch')
+def predict_stream_batch(request: StreamEventBatchRequest):
+    try:
+        return predict_from_live_events(request.events, request.output_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

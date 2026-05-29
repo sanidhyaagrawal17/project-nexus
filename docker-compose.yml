@@ -23,7 +23,7 @@ services:
       PORT: 5000
       MONGO_URI: mongodb://mongodb:27017/nexusDB
       ML_SERVICE_URL: http://ml-pipeline:8000
-      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      CORS_ORIGINS: http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://nexus
       MAX_JSON_BODY_SIZE: 100mb
       MAX_URLENCODED_BODY_SIZE: 100mb
       MAX_UPLOAD_SIZE_MB: 100
@@ -48,6 +48,7 @@ services:
       args:
         VITE_API_URL: http://localhost:5000
     ports:
+      - "80:80"
       - "5173:80"
     depends_on:
       - backend

@@ -23,6 +23,7 @@ The project is built with:
 3. Alerts, processed file metadata, and analyst feedback are persisted in MongoDB.
 4. Socket.IO pushes progress and completion events to the React dashboard.
 5. The retraining scheduler can launch the Python retraining job on a weekly cadence.
+6. Live transaction events can be buffered for a short window and scored as micro-batches.
 
 ## Repository Layout
 
@@ -40,8 +41,11 @@ docker compose up -d --build
 Then open:
 
 - Frontend: http://localhost:5173
+- Frontend alias: http://nexus
 - Backend: http://localhost:5000/healthz
 - Backend readiness: http://localhost:5000/readyz
+
+To use `http://nexus` on Windows, run `scripts/register-nexus-host.ps1` from an elevated PowerShell session once. That adds `127.0.0.1 nexus` to your hosts file so the browser can resolve the name locally.
 
 ## Configuration
 
@@ -61,6 +65,20 @@ Frontend build:
 Before running the backend for the first time, initialize the database indexes by running: `node backend/scripts/init_db.js`.
 
 If you are running the application outside Docker, set `MONGO_URI` and `PYTHON_EXECUTABLE` in your environment or `.env` file before starting the backend.
+
+### Live Stream Ingest
+
+Send transaction events to `POST /api/live-events` as a single object, an `event` wrapper, or an `events` array. Each event should include `source_account` and `destination_account`, plus optional `amount`, `timestamp`, `transaction_type`, and `channel` fields.
+
+Example:
+
+```bash
+curl -X POST http://localhost:5000/api/live-events \
+	-H "Content-Type: application/json" \
+	-d '{"events":[{"source_account":"A123","destination_account":"B456","amount":1800.5,"timestamp":"2026-05-27T12:00:00Z","transaction_type":"WIRE_TRANSFER","channel":"api"}]}'
+```
+
+The backend buffers events for a short window, sends them to the Python scorer, stores any resulting alerts, and emits Socket.IO updates when the batch completes.
 
 ## Notes
 

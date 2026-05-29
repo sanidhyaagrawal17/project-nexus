@@ -3,26 +3,25 @@ import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tool
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
 
-// ─── Design tokens (warm zinc — easier on eyes than cold slate/blue) ──────────
 const T = {
-    bg:       '#111214',   
-    surface:  '#18191d',   
-    raised:   '#1e2026',   
-    border:   '#2c2e36',   
-    borderHi: '#383a46',   
-    txt1:     '#dde0e8',   
-    txt2:     '#8b8fa3',   
-    txt3:     '#555769',   
-    accent:   '#5b6af0',   
-    accentBg: '#1e2140',   
-    crit:     '#d97634',   
-    critBg:   '#221a0f',
-    critBdr:  '#3d2a12',
-    high:     '#4a8fd4',   
-    highBg:   '#0d1a2a',
-    highBdr:  '#1a3050',
-    ok:       '#4a9e6e',   
-    okBg:     '#0d1f16',
+    bg: '#111214',
+    surface: '#18191d',
+    raised: '#1e2026',
+    border: '#2c2e36',
+    borderHi: '#383a46',
+    txt1: '#dde0e8',
+    txt2: '#8b8fa3',
+    txt3: '#555769',
+    accent: '#5b6af0',
+    accentBg: '#1e2140',
+    crit: '#d97634',
+    critBg: '#221a0f',
+    critBdr: '#3d2a12',
+    high: '#4a8fd4',
+    highBg: '#0d1a2a',
+    highBdr: '#1a3050',
+    ok: '#4a9e6e',
+    okBg: '#0d1f16',
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -399,6 +398,9 @@ const Dashboard = () => {
     const [searchType, setSearchType]               = useState('ACCOUNT_ID');
     const [jumpPage, setJumpPage]                   = useState('');
     const [selectedAccount, setSelectedAccount]     = useState(null);
+    const [uploadLimitEnabled, setUploadLimitEnabled] = useState(true);
+    const [maxUploadMB, setMaxUploadMB] = useState(100);
+    const [perUploadMB, setPerUploadMB] = useState(100);
     const [currentPage, setCurrentPage]             = useState(1);
     const [resolvedIds, setResolvedIds]             = useState(new Set());
     const [sidebarCollapsed, setSidebarCollapsed]   = useState(false);
@@ -409,6 +411,7 @@ const Dashboard = () => {
     const [droppedFeatures, setDroppedFeatures]     = useState([]);
     const [featureImportance, setFeatureImportance]  = useState([]);
     const [selectedSampleDataset, setSelectedSampleDataset] = useState(sampleDatasets[0]);
+    const [datasetSourceFilter, setDatasetSourceFilter] = useState('ALL');
     const itemsPerPage   = 12;
     const fileInputRef   = useRef(null);
     const statusInterval = useRef(null);
@@ -436,7 +439,7 @@ const Dashboard = () => {
     };
 
     const fetchAlerts     = async () => { try { const data = await fetchJson('/api/alerts');   if (data) setAlerts(data.data); } catch {} };
-    const fetchDatasets   = async () => { try { const data = await fetchJson('/api/datasets'); if (data) setAvailableDatasets(data.data); } catch {} };
+    const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch {} };
     const fetchModelConfig = async () => {
         try {
             const data = await fetchJson('/api/config');
@@ -454,7 +457,10 @@ const Dashboard = () => {
         try {
             const [logsData, filesData] = await Promise.all([fetchJson('/api/logs'), fetchJson('/api/files')]);
             if (logsData) setLogs(logsData.data);
-            if (filesData) setUploadedFiles(filesData.data);
+            if (filesData) {
+                setUploadedFiles(filesData.data);
+                setAvailableDatasets(filesData.data);
+            }
             setLoading(false);
         } catch { setLoading(false); }
     };
@@ -486,6 +492,14 @@ const Dashboard = () => {
         });
         socket.on('SILENT_REFRESH', () => { fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
+        socket.on('SYNC_STATE', (state) => {
+            try {
+                if (state.alerts) setAlerts(state.alerts || []);
+                if (state.files) { setUploadedFiles(state.files || []); setAvailableDatasets(state.files || []); }
+                if (state.logs) setLogs(state.logs || []);
+                if (state.config && state.config.thresholds) setModelConfig(state.config.thresholds);
+            } catch (e) { /* ignore */ }
+        });
         socket.on('ENGINE_PROGRESS', (payload) => {
             try {
                 if (payload && payload.status) {
@@ -505,7 +519,30 @@ const Dashboard = () => {
         return () => { socket.disconnect(); socketRefLocal.current = null; };
     }, []);
 
-    useEffect(() => { setCurrentPage(1); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset]);
+    // fetch upload limit config
+    useEffect(() => {
+        (async () => {
+            try {
+                const r = await fetch(`${API_BASE}/api/upload-config`);
+                if (!r.ok) return;
+                const j = await r.json();
+                if (j && j.success) {
+                    setMaxUploadMB(Number(j.maxUploadMB || 0));
+                    setUploadLimitEnabled(Boolean(j.enabled));
+                    setPerUploadMB(Number(j.maxUploadMB || 0));
+                }
+            } catch (e) { /* ignore */ }
+        })();
+    }, []);
+
+    useEffect(() => { setCurrentPage(1); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset, datasetSourceFilter]);
+
+    useEffect(() => {
+        const visibleDatasets = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || (file.sourceType || (String(file.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST')) === datasetSourceFilter);
+        if (activeDataset !== 'ALL' && !visibleDatasets.some(file => file.fileName === activeDataset)) {
+            setActiveDataset('ALL');
+        }
+    }, [availableDatasets, datasetSourceFilter, activeDataset]);
 
     const startStatusTracking = () => {
         // If we have a socket connection that emits ENGINE_PROGRESS, prefer that over polling
@@ -571,7 +608,9 @@ const Dashboard = () => {
         const fd = new FormData(); fd.append('telemetryFile', file);
         let uploadAccepted = false;
         try {
-            const res = await fetch(`${API_BASE}/api/upload`, { method:'POST', body:fd });
+                // include optional per-upload override as query param
+                const qp = perUploadMB ? `?max_upload_mb=${encodeURIComponent(Number(perUploadMB))}` : '';
+                const res = await fetch(`${API_BASE}/api/upload${qp}`, { method:'POST', body:fd });
             const data = await res.json();
             if (!res.ok) {
                 if (data.message === 'DUPLICATE_FILE') {
@@ -591,6 +630,19 @@ const Dashboard = () => {
             }
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
+    };
+
+    const saveUploadConfig = async () => {
+        try {
+            const body = { maxUploadMB: uploadLimitEnabled ? Number(maxUploadMB) : null, enabled: uploadLimitEnabled };
+            const r = await fetch(`${API_BASE}/api/upload-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const j = await r.json();
+            if (r.ok && j && j.success) {
+                toast.success('Upload configuration saved.');
+            } else {
+                toast.error('Failed to save upload configuration.');
+            }
+        } catch (e) { console.error(e); toast.error('Failed to save upload configuration.'); }
     };
 
     const handleResolve = async (accountId, e) => {
@@ -615,8 +667,15 @@ const Dashboard = () => {
     };
 
     // ── Derived ────────────────────────────────────────────────────────────────
+    const resolveSourceType = (file) => file?.sourceType || (String(file?.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST');
+    const visibleDatasetFiles = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || resolveSourceType(file) === datasetSourceFilter);
+    const visibleDatasetNames = new Set(visibleDatasetFiles.map(file => file.fileName));
     const unresolvedAlerts = alerts.filter(a => !resolvedIds.has(a.accountId));
-    const activeAlerts     = unresolvedAlerts.filter(a => activeDataset === 'ALL' || a.sourceFileName === activeDataset);
+    const activeAlerts     = unresolvedAlerts.filter(a => {
+        const matchesDataset = activeDataset === 'ALL' || a.sourceFileName === activeDataset;
+        const matchesSource = datasetSourceFilter === 'ALL' || visibleDatasetNames.has(a.sourceFileName);
+        return matchesDataset && matchesSource;
+    });
 
     const filteredAlerts = activeAlerts.filter(a => {
         const tab = activeTab === 'ALL' || (activeTab === 'CRITICAL' && a.status === 'Critical') || (activeTab === 'HIGH_RISK' && a.status === 'High Risk');
@@ -648,11 +707,13 @@ const Dashboard = () => {
         setJumpPage('');
     };
 
-    const critCount = activeAlerts.filter(a => a.status === 'Critical').length;
-    const highCount = activeAlerts.filter(a => a.status === 'High Risk').length;
-    const totalScanned = activeDataset === 'ALL'
-        ? uploadedFiles.reduce((s, f) => s + (f.totalAccountsScanned || 0), 0)
-        : uploadedFiles.find(f => f.fileName === activeDataset)?.totalAccountsScanned || 0;
+    // Count unique accounts for critical/high-risk to avoid double-counting multiple alerts per account
+    const critCount = new Set(activeAlerts.filter(a => a.status === 'Critical').map(a => a.accountId)).size;
+    const highCount = new Set(activeAlerts.filter(a => a.status === 'High Risk').map(a => a.accountId)).size;
+    const baseScanned = activeDataset === 'ALL'
+        ? visibleDatasetFiles.reduce((s, f) => s + (f.totalAccountsScanned || 0), 0)
+        : visibleDatasetFiles.find(f => f.fileName === activeDataset)?.totalAccountsScanned || 0;
+    const totalScanned = Math.max(baseScanned, critCount + highCount);
 
     const riskData    = [{ name:'Critical', value:critCount }, { name:'High Risk', value:highCount }];
     const CHART_CLRS  = [T.crit, T.high];
@@ -710,6 +771,11 @@ const Dashboard = () => {
         // If sample count is tiny, metrics like PR/ROC can be artificially perfect — hide them
         if (sampleCount && sampleCount < 20) return 'n/a';
         return num.toFixed(3);
+    };
+
+    const openLiveRoute = (path) => {
+        window.history.pushState({}, '', path);
+        window.dispatchEvent(new PopStateEvent('popstate'));
     };
 
     if (loading) return (
@@ -812,24 +878,66 @@ const Dashboard = () => {
                     })}
                 </nav>
 
+                {!sidebarCollapsed && (
+                    <div style={{ padding:'12px 12px', borderTop:`1px solid ${T.border}` }}>
+                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>
+                            Live Operations
+                        </div>
+                        <div style={{ display:'grid', gap:8 }}>
+                            <button
+                                onClick={() => openLiveRoute('/live-stream')}
+                                style={{ width:'100%', padding:'9px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left' }}
+                            >
+                                Current Live Stream
+                            </button>
+                            <button
+                                onClick={() => openLiveRoute('/live-stream/audit')}
+                                style={{ width:'100%', padding:'9px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left' }}
+                            >
+                                Live Audit Log
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Corpus selector */}
                 {!sidebarCollapsed && availableDatasets.length > 0 && (
                     <div style={{ padding:'12px 12px', borderTop:`1px solid ${T.border}` }}>
                         <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>
                             Active Corpus
                         </div>
-                        <div style={{ position:'relative' }}>
-                            <select value={activeDataset} onChange={e => setActiveDataset(e.target.value)}
-                                style={{ width:'100%', padding:'7px 28px 7px 10px', fontSize:12, borderRadius:5, outline:'none',
-                                    background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, cursor:'pointer',
-                                    appearance:'none', fontFamily:'monospace' }}>
-                                <option value="ALL">All Datasets</option>
-                                {availableDatasets.map((ds, i) => <option key={i} value={ds}>{ds}</option>)}
-                            </select>
-                            <svg width="12" height="12" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24"
-                                style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                            </svg>
+                        <div style={{ display:'grid', gap:8 }}>
+                            <div style={{ position:'relative' }}>
+                                <select value={datasetSourceFilter} onChange={e => setDatasetSourceFilter(e.target.value)}
+                                    style={{ width:'100%', padding:'7px 28px 7px 10px', fontSize:12, borderRadius:5, outline:'none',
+                                        background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, cursor:'pointer',
+                                        appearance:'none', fontFamily:'monospace' }}>
+                                    <option value="ALL">All Sources</option>
+                                    <option value="STATIC_INGEST">Static Ingest</option>
+                                    <option value="LIVE_STREAM">Live Stream</option>
+                                </select>
+                                <svg width="12" height="12" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24"
+                                    style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                            <div style={{ position:'relative' }}>
+                                <select value={activeDataset} onChange={e => setActiveDataset(e.target.value)}
+                                    style={{ width:'100%', padding:'7px 28px 7px 10px', fontSize:12, borderRadius:5, outline:'none',
+                                        background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, cursor:'pointer',
+                                        appearance:'none', fontFamily:'monospace' }}>
+                                    <option value="ALL">All Datasets</option>
+                                    {visibleDatasetFiles.map((file, i) => (
+                                        <option key={`${file.fileHash || file.fileName}-${i}`} value={file.fileName}>
+                                            {`${file.fileName} · ${resolveSourceType(file) === 'LIVE_STREAM' ? 'Live' : 'Static'} · ${(file.totalAccountsScanned || 0).toLocaleString()} scanned`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <svg width="12" height="12" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24"
+                                    style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -969,10 +1077,29 @@ const Dashboard = () => {
                                                     color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
                                                 Upload CSV
                                             </button>
+                                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                                <label style={{ fontSize:12, color:T.txt2, display:'flex', alignItems:'center', gap:8 }}>
+                                                    <input type="checkbox" checked={uploadLimitEnabled} onChange={e => setUploadLimitEnabled(e.target.checked)} />
+                                                    <span style={{ marginLeft:6 }}>Limit uploads</span>
+                                                </label>
+                                                <input type="number" min={1} value={maxUploadMB} onChange={e => setMaxUploadMB(e.target.value)}
+                                                    style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
+                                                <button onClick={saveUploadConfig} style={{ padding:'8px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.surface, color:T.txt1, cursor:'pointer' }}>Save</button>
+                                                <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:8 }}>
+                                                    <span style={{ fontSize:12, color:T.txt2 }}>Per-upload MB</span>
+                                                    <input type="number" min={1} value={perUploadMB} onChange={e => setPerUploadMB(e.target.value)}
+                                                        style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
+                                                </div>
+                                            </div>
                                             <button onClick={() => setCurrentView('ANALYTICS')}
                                                 style={{ padding:'10px 16px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.surface,
                                                     color:T.txt1, fontSize:12, fontWeight:700, cursor:'pointer' }}>
                                                 View Model Analytics
+                                            </button>
+                                            <button onClick={() => openLiveRoute('/live-stream')}
+                                                style={{ padding:'10px 16px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.bg,
+                                                    color:T.txt1, fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                                                Live Stream Connector
                                             </button>
                                         </div>
                                     </div>
@@ -1509,7 +1636,7 @@ const Dashboard = () => {
                             ) : (
                                 <Card>
                                     <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                                        <thead><tr><TH>Ingested At</TH><TH>File Name</TH><TH>SHA-256 Hash</TH></tr></thead>
+                                        <thead><tr><TH>Ingested At</TH><TH>File Name</TH><TH>Source</TH><TH>SHA-256 Hash</TH></tr></thead>
                                         <tbody>
                                             {currentFiles.length > 0 ? currentFiles.map((file, i) => (
                                                 <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }}
@@ -1521,12 +1648,17 @@ const Dashboard = () => {
                                                     <td style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.high, fontFamily:'monospace' }}>
                                                         {file.fileName}
                                                     </td>
+                                                    <td style={{ padding:'10px 16px' }}>
+                                                        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:resolveSourceType(file) === 'LIVE_STREAM' ? T.high : T.txt2, background: resolveSourceType(file) === 'LIVE_STREAM' ? T.highBg : T.raised, border:`1px solid ${resolveSourceType(file) === 'LIVE_STREAM' ? T.highBdr : T.borderHi}`, padding:'2px 8px', borderRadius:3 }}>
+                                                            {resolveSourceType(file) === 'LIVE_STREAM' ? 'Live Stream' : 'Static Ingest'}
+                                                        </span>
+                                                    </td>
                                                     <td style={{ padding:'10px 16px', fontFamily:'monospace', fontSize:11, color:T.txt3, wordBreak:'break-all' }}>
                                                         {file.fileHash}
                                                     </td>
                                                 </tr>
                                             )) : (
-                                                <tr><td colSpan="3" style={{ padding:'32px 16px', textAlign:'center',
+                                                <tr><td colSpan="4" style={{ padding:'32px 16px', textAlign:'center',
                                                     color:T.txt3, fontSize:12, fontFamily:'monospace', letterSpacing:'0.08em' }}>
                                                     NO DATASETS INGESTED
                                                 </td></tr>

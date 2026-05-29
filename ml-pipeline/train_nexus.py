@@ -320,8 +320,27 @@ def run_nexus_pipeline():
     )
     xgb_model.fit(X_train_balanced, y_train_balanced)
 
+    print('\n[*] Phase 3b: Training standby XGBoost classifier...')
+    standby_xgb_model = XGBClassifier(
+        n_estimators=320,
+        max_depth=3,
+        learning_rate=0.045,
+        subsample=0.72,
+        colsample_bytree=0.72,
+        min_child_weight=5,
+        reg_lambda=16,
+        reg_alpha=0.3,
+        n_jobs=-1,
+        tree_method='hist',
+        random_state=99,
+        eval_metric='logloss',
+    )
+    standby_xgb_model.fit(X_train_balanced, y_train_balanced)
+
     calibrated_model = xgb_model
+    standby_calibrated_model = standby_xgb_model
     calibration_available = False
+    standby_calibration_available = False
     try:
         # Newer sklearn releases removed cv='prefit'; wrap the fitted model instead.
         if FrozenEstimator is not None:
@@ -334,16 +353,34 @@ def run_nexus_pipeline():
     except Exception as exc:
         print(f'[!] Calibration skipped: {exc}')
 
+    try:
+        if FrozenEstimator is not None:
+            standby_calibration_model = CalibratedClassifierCV(estimator=FrozenEstimator(standby_xgb_model), method='isotonic', cv=3)
+        else:
+            standby_calibration_model = CalibratedClassifierCV(estimator=standby_xgb_model, method='isotonic', cv=3)
+        standby_calibration_model.fit(X_calib_enhanced, y_calib)
+        standby_calibrated_model = standby_calibration_model
+        standby_calibration_available = True
+    except Exception as exc:
+        print(f'[!] Standby calibration skipped: {exc}')
+
     # Fix: keep calibrated probabilities untouched so threshold tuning and metrics remain valid.
     validation_probabilities = calibrated_model.predict_proba(X_calib_enhanced)[:, 1]
+    standby_validation_probabilities = standby_calibrated_model.predict_proba(X_calib_enhanced)[:, 1]
 
     threshold_settings = optimize_threshold(y_calib, validation_probabilities)
+    standby_threshold_settings = optimize_threshold(y_calib, standby_validation_probabilities)
     threshold_curve = build_threshold_curve(y_calib, validation_probabilities)
+    standby_threshold_curve = build_threshold_curve(y_calib, standby_validation_probabilities)
 
     test_probabilities = calibrated_model.predict_proba(X_test_enhanced)[:, 1]
+    standby_test_probabilities = standby_calibrated_model.predict_proba(X_test_enhanced)[:, 1]
 
     metrics = compute_model_metrics(y_test, test_probabilities, threshold_settings['alert_threshold'])
     metrics['calibration_used'] = calibration_available
+
+    standby_metrics = compute_model_metrics(y_test, standby_test_probabilities, standby_threshold_settings['alert_threshold'])
+    standby_metrics['calibration_used'] = standby_calibration_available
 
     feature_importances = pd.DataFrame(
         xgb_model.feature_importances_,
@@ -382,9 +419,12 @@ def run_nexus_pipeline():
 
     joblib.dump(iso_forest, os.path.join(model_dir, 'nexus_iso_forest.pkl'))
     joblib.dump(xgb_model, os.path.join(model_dir, 'nexus_xgboost.pkl'))
+    joblib.dump(standby_xgb_model, os.path.join(model_dir, 'nexus_xgboost_standby.pkl'))
     joblib.dump(calibrated_model, os.path.join(model_dir, 'nexus_calibrated_model.pkl'))
+    joblib.dump(standby_calibrated_model, os.path.join(model_dir, 'nexus_calibrated_model_standby.pkl'))
     joblib.dump(list(X_train_enhanced.columns), os.path.join(model_dir, 'nexus_feature_schema.pkl'))
     joblib.dump(threshold_settings, os.path.join(model_dir, 'nexus_thresholds.pkl'))
+    joblib.dump(standby_threshold_settings, os.path.join(model_dir, 'nexus_thresholds_standby.pkl'))
     joblib.dump(anomaly_scaler, os.path.join(model_dir, 'nexus_anomaly_scaler.pkl'))
 
     save_json(os.path.join(output_dir, 'model_metrics.json'), {
@@ -399,9 +439,12 @@ def run_nexus_pipeline():
         },
         'thresholds': threshold_settings,
         'metrics': metrics,
+        'standbyThresholds': standby_threshold_settings,
+        'standbyMetrics': standby_metrics,
         'featureImportance': feature_importance_payload,
         'highPriorityFeatures': metadata['high_priority_features'],
         'thresholdCurve': threshold_curve,
+        'standbyThresholdCurve': standby_threshold_curve,
         'droppedFeatures': dropped_features,
         'featureCount': int(X.shape[1]),
         'engineeredFeatureCount': int(len(metadata['feature_columns']) - X.shape[1]),

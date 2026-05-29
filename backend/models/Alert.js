@@ -32,6 +32,6 @@ const alertSchema = new mongoose.Schema({
     detectedAt: { type: Date, default: Date.now } 
 });
 
-alertSchema.index({ accountId: 1 });
+// index already declared on accountId; avoid duplicate index declaration
 
 module.exports = mongoose.model('Alert', alertSchema);

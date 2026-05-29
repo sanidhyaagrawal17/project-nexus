@@ -1,0 +1,833 @@
+{
+    "success": true,
+    "count": 16,
+    "thresholds": {
+        "alert_threshold": 0.98,
+        "critical_threshold": 0.99,
+        "best_fbeta": 1.0,
+        "best_f1": 1.0,
+        "best_precision": 1.0,
+        "best_recall": 1.0
+    },
+    "metrics": {
+        "threshold": 0.98,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "roc_auc": 1.0,
+        "pr_auc": 1.0,
+        "confusion_matrix": [
+            [
+                1801,
+                0
+            ],
+            [
+                0,
+                16
+            ]
+        ],
+        "classification_report": {
+            "0": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 1801.0
+            },
+            "1": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 16.0
+            },
+            "accuracy": 1.0,
+            "macro avg": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 1817.0
+            },
+            "weighted avg": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 1817.0
+            }
+        },
+        "alert_count": 16,
+        "sample_count": 1817,
+        "calibration_used": true
+    },
+    "featureImportance": [
+        {
+            "name": "F3912",
+            "importance": 0.2676750123500824
+        },
+        {
+            "name": "row_abs_sum",
+            "importance": 0.07074300199747086
+        },
+        {
+            "name": "F543",
+            "importance": 0.06583700329065323
+        },
+        {
+            "name": "F2553",
+            "importance": 0.05232600122690201
+        },
+        {
+            "name": "row_std",
+            "importance": 0.04884500056505203
+        },
+        {
+            "name": "F265",
+            "importance": 0.04346499964594841
+        },
+        {
+            "name": "F3913",
+            "importance": 0.040105998516082764
+        },
+        {
+            "name": "burstiness_index",
+            "importance": 0.037679001688957214
+        },
+        {
+            "name": "F3822",
+            "importance": 0.03748900070786476
+        },
+        {
+            "name": "F2533",
+            "importance": 0.03746100142598152
+        },
+        {
+            "name": "F3507",
+            "importance": 0.028788000345230103
+        },
+        {
+            "name": "F3914",
+            "importance": 0.020979000255465508
+        },
+        {
+            "name": "F3843",
+            "importance": 0.020078999921679497
+        },
+        {
+            "name": "F2481",
+            "importance": 0.017691999673843384
+        },
+        {
+            "name": "F1938",
+            "importance": 0.015097999945282936
+        },
+        {
+            "name": "F1290",
+            "importance": 0.012397999875247478
+        },
+        {
+            "name": "F2077",
+            "importance": 0.010664000175893307
+        },
+        {
+            "name": "F115_minus_F321",
+            "importance": 0.010262000374495983
+        },
+        {
+            "name": "F2524",
+            "importance": 0.00941499974578619
+        },
+        {
+            "name": "F3614",
+            "importance": 0.00940100010484457
+        },
+        {
+            "name": "F3919",
+            "importance": 0.009057000279426575
+        },
+        {
+            "name": "row_min",
+            "importance": 0.008766000159084797
+        },
+        {
+            "name": "Anomaly_Score",
+            "importance": 0.008313000202178955
+        },
+        {
+            "name": "F468",
+            "importance": 0.007838999852538109
+        },
+        {
+            "name": "F3748",
+            "importance": 0.006814000196754932
+        },
+        {
+            "name": "F2527",
+            "importance": 0.006808999925851822
+        },
+        {
+            "name": "F3633",
+            "importance": 0.00674000009894371
+        },
+        {
+            "name": "F2738",
+            "importance": 0.006227000150829554
+        },
+        {
+            "name": "F3900",
+            "importance": 0.005776999983936548
+        },
+        {
+            "name": "F3783",
+            "importance": 0.005375999957323074
+        },
+        {
+            "name": "F3750",
+            "importance": 0.0047530001029372215
+        },
+        {
+            "name": "F2233",
+            "importance": 0.004592000041157007
+        },
+        {
+            "name": "F3899",
+            "importance": 0.00446499977260828
+        },
+        {
+            "name": "F3820",
+            "importance": 0.003671000013127923
+        },
+        {
+            "name": "F339",
+            "importance": 0.0033770001027733088
+        },
+        {
+            "name": "F1740",
+            "importance": 0.003237999975681305
+        },
+        {
+            "name": "F2728",
+            "importance": 0.0032140000257641077
+        },
+        {
+            "name": "F1614",
+            "importance": 0.0030960000585764647
+        },
+        {
+            "name": "F3659",
+            "importance": 0.0026030000299215317
+        },
+        {
+            "name": "F3896",
+            "importance": 0.0025309999473392963
+        }
+    ],
+    "data": [
+        {
+            "accountId": "9074",
+            "riskScore": 100.0,
+            "anomalyScore": 87.801,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.098,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 12585.7521,
+                    "contribution": 0.6393,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 1.0,
+                    "contribution": 0.3804,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 1.0,
+                    "contribution": -0.2832,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3722",
+                    "raw": -1.0,
+                    "contribution": -0.1226,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9036",
+            "riskScore": 100.0,
+            "anomalyScore": 69.813,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.0469,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 3.0,
+                    "contribution": -1.0367,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 17364.9124,
+                    "contribution": 0.3042,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3913",
+                    "raw": 1.0,
+                    "contribution": -0.2359,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F1570",
+                    "raw": 1.0,
+                    "contribution": -0.2029,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9019",
+            "riskScore": 100.0,
+            "anomalyScore": 83.066,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.1146,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 14471.3205,
+                    "contribution": 0.6319,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.3949,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F267",
+                    "raw": 0.15,
+                    "contribution": -0.2897,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 0.0,
+                    "contribution": 0.1167,
+                    "direction": "UP"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9040",
+            "riskScore": 100.0,
+            "anomalyScore": 79.624,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.1839,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.3572,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 2.0,
+                    "contribution": -0.2902,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F267",
+                    "raw": 0.2,
+                    "contribution": -0.2592,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3750",
+                    "raw": -0.8,
+                    "contribution": -0.1326,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9007",
+            "riskScore": 100.0,
+            "anomalyScore": 73.121,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.0965,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 3.0,
+                    "contribution": -0.7805,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 35624.4451,
+                    "contribution": -0.387,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "row_abs_sum",
+                    "raw": 50372965.4415,
+                    "contribution": -0.282,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3843",
+                    "raw": 266.86,
+                    "contribution": -0.1806,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9017",
+            "riskScore": 100.0,
+            "anomalyScore": 94.33,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.1056,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 9944.4044,
+                    "contribution": 0.7388,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.3957,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 2.0,
+                    "contribution": -0.2832,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F1529",
+                    "raw": 1.0,
+                    "contribution": -0.1248,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9009",
+            "riskScore": 100.0,
+            "anomalyScore": 96.818,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.2757,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 187646.1917,
+                    "contribution": -0.5447,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "row_abs_sum",
+                    "raw": 246942388.2307,
+                    "contribution": -0.4292,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 1.0,
+                    "contribution": 0.3618,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3843",
+                    "raw": 1406152.73,
+                    "contribution": 0.2355,
+                    "direction": "UP"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9013",
+            "riskScore": 100.0,
+            "anomalyScore": 96.208,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.2114,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 3.0,
+                    "contribution": -0.7314,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 43260.975,
+                    "contribution": -0.4158,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "row_abs_sum",
+                    "raw": 66838206.4003,
+                    "contribution": -0.316,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3843",
+                    "raw": 70.99,
+                    "contribution": -0.1337,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9044",
+            "riskScore": 100.0,
+            "anomalyScore": 92.818,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.0519,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 9029.5591,
+                    "contribution": 0.803,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.3678,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F267",
+                    "raw": 0.23,
+                    "contribution": -0.17,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F1529",
+                    "raw": 1.0,
+                    "contribution": -0.1306,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9032",
+            "riskScore": 100.0,
+            "anomalyScore": 86.391,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 5.9021,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 3.0,
+                    "contribution": -0.9387,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 9513.8928,
+                    "contribution": 0.5187,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3783",
+                    "raw": -1.0,
+                    "contribution": -0.1699,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3913",
+                    "raw": 1.0,
+                    "contribution": -0.1532,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9070",
+            "riskScore": 100.0,
+            "anomalyScore": 86.32,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 5.7466,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F364",
+                    "raw": 1.04,
+                    "contribution": -0.8365,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 10712.218,
+                    "contribution": 0.7816,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 1.0,
+                    "contribution": 0.3742,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 3.0,
+                    "contribution": -0.2902,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9049",
+            "riskScore": 100.0,
+            "anomalyScore": 94.223,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.2773,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 16563.0442,
+                    "contribution": 0.5062,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 1.0,
+                    "contribution": 0.4014,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F1529",
+                    "raw": 1.0,
+                    "contribution": -0.1208,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F2183",
+                    "raw": 0.0429,
+                    "contribution": -0.1179,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9055",
+            "riskScore": 100.0,
+            "anomalyScore": 97.18,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 5.7592,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F364",
+                    "raw": 1.05,
+                    "contribution": -0.8365,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 11831.8073,
+                    "contribution": 0.7321,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.4037,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 1.0,
+                    "contribution": -0.2832,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9043",
+            "riskScore": 100.0,
+            "anomalyScore": 83.964,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.2293,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.4027,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 16935.1192,
+                    "contribution": 0.3828,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 0.0,
+                    "contribution": 0.1167,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F1529",
+                    "raw": 0.0,
+                    "contribution": 0.1066,
+                    "direction": "UP"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9080",
+            "riskScore": 100.0,
+            "anomalyScore": 88.556,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.1066,
+                    "direction": "UP"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 6652.6331,
+                    "contribution": 0.748,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 0.0,
+                    "contribution": 0.4008,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3922",
+                    "raw": 0.0,
+                    "contribution": 0.1167,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F1529",
+                    "raw": 0.0,
+                    "contribution": 0.1102,
+                    "direction": "UP"
+                }
+            ],
+            "status": "Critical"
+        },
+        {
+            "accountId": "9063",
+            "riskScore": 100.0,
+            "anomalyScore": 70.953,
+            "topFeatures": [
+                {
+                    "name": "F3912",
+                    "raw": 1.0,
+                    "contribution": 6.0266,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3899",
+                    "raw": 3.0,
+                    "contribution": -1.0424,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3913",
+                    "raw": 1.0,
+                    "contribution": -0.2405,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "burstiness_index",
+                    "raw": 16482.0662,
+                    "contribution": 0.2153,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F1321",
+                    "raw": 11001.0,
+                    "contribution": -0.1285,
+                    "direction": "DOWN"
+                }
+            ],
+            "status": "Critical"
+        }
+    ]
+}
