@@ -273,6 +273,21 @@ const ActorBadge = ({ actor }) => {
     );
 };
 
+const MuleStatusBadge = ({ status }) => {
+    const s = String(status || 'Pending');
+    const map = {
+        Pending: { color: T.txt2, bg: T.bg, border: T.border },
+        'Confirmed Mule': { color: T.crit, bg: T.critBg, border: T.critBdr },
+        'Not a Mule': { color: T.ok, bg: T.okBg, border: '#163028' },
+    };
+    const style = map[s] || map['Pending'];
+    return (
+        <span style={{ fontSize:11, fontWeight:800, letterSpacing:'0.06em', textTransform:'uppercase',
+            color: style.color, background: style.bg, border:`1px solid ${style.border}`,
+            padding:'6px 10px', borderRadius:8, minWidth:90, display:'inline-block', textAlign:'center' }}>{s}</span>
+    );
+};
+
 const BarTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
@@ -1558,9 +1573,7 @@ const Dashboard = () => {
                                                     <td style={{ padding:'11px 16px' }}>
                                                         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                                                             <StatusChip status={alert.status} />
-                                                            <span style={{ fontSize:11, color:T.txt3, padding:'4px 8px', borderRadius:6, border:`1px solid ${T.border}`, background:T.bg }}>
-                                                                {alert.muleStatus || 'Pending'}
-                                                            </span>
+                                                            <MuleStatusBadge status={alert.muleStatus || 'Pending'} />
                                                         </div>
                                                     </td>
                                                     <td style={{ padding:'11px 16px', minWidth:110 }}>

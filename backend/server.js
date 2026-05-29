@@ -6,7 +6,21 @@ const fs = require('fs');
 const crypto = require('crypto');
 require('dotenv').config();
 const mongoose = require('mongoose');
-const { faker } = require('@faker-js/faker');
+// Conditional lightweight faker shim for test environments to avoid ESM parsing issues in Jest.
+let faker;
+if (String(process.env.NODE_ENV || '').toLowerCase() === 'test') {
+    faker = {
+        person: { fullName: () => 'Test User' },
+        internet: { email: () => 'test@example.local', ipv4: () => '127.0.0.1' },
+        phone: { number: () => '000-000-0000' },
+        finance: { amount: ({ min = 0 }) => String(min) },
+        helpers: { arrayElement: (arr) => (Array.isArray(arr) ? arr[0] : arr) },
+        string: { uuid: () => '00000000-0000-0000-0000-000000000000' },
+        date: { recent: () => new Date() }
+    };
+} else {
+    ({ faker } = require('@faker-js/faker'));
+}
 const http = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
@@ -24,6 +38,7 @@ const { spawn } = require('child_process');
 const app = express();
 const PORT = Number.parseInt(process.env.PORT || '5000', 10);
 const server = http.createServer(app);
+const IS_TEST = String(process.env.NODE_ENV || '').toLowerCase() === 'test';
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173,http://nexus')
     .split(',')
     .map(origin => origin.trim())
@@ -1134,16 +1149,29 @@ async function bootstrap() {
             }
         } catch (err) { console.error('[!] Failed to load uploadConfig from DB:', err && err.message ? err.message : err); }
 
-        startRetrainScheduler(registerActiveChildProcess);
-        liveStreamProcessor.start();
-        server.listen(PORT, () => console.log(` [+] Nexus Backend & WebSocket listening on port ${PORT}`));
+        // In test mode we avoid starting background schedulers and the live stream processor
+        // to keep the test environment lightweight and deterministic.
+        if (!IS_TEST) {
+            startRetrainScheduler(registerActiveChildProcess);
+            liveStreamProcessor.start();
+            server.listen(PORT, () => console.log(` [+] Nexus Backend & WebSocket listening on port ${PORT}`));
+        } else {
+            console.log(' [+] Bootstrapped in test mode (no background jobs started)');
+        }
     } catch (err) {
         console.error(' [!] Database Connection Error:', err);
         process.exit(1);
     }
 }
 
-bootstrap();
+// Export bootstrap for tests to call when NODE_ENV=test. In normal runs bootstrap() is invoked immediately.
+async function exportedBootstrap() { return bootstrap(); }
+
+if (!IS_TEST) {
+    bootstrap();
+}
+
+module.exports = { app, server, bootstrap: exportedBootstrap, IS_TEST };
 server.setTimeout(600000);
 
 // Runtime upload configuration endpoints
