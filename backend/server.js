@@ -10,6 +10,7 @@ const { faker } = require('@faker-js/faker');
 const http = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
+const FormData = require('form-data');
 const { pipeline } = require('stream/promises');
 
 const Alert = require('./models/Alert');
@@ -110,24 +111,17 @@ let shuttingDown = false;
 const liveStreamWindowMs = Number.parseInt(process.env.LIVE_STREAM_WINDOW_MS || '10000', 10);
 const liveStreamMaxBatchSize = Number.parseInt(process.env.LIVE_STREAM_MAX_BATCH_SIZE || '250', 10);
 
-const simpleRateBuckets = new Map();
-
+// Lightweight wrapper that delegates to express-rate-limit while keeping a
+// compatible factory signature. This avoids the previous Map-based implementation
+// that never cleaned up keys and caused a memory leak.
 function createSimpleRateLimit({ windowMs, maxRequests }) {
-    return (req, res, next) => {
-        const key = `${req.ip || req.connection.remoteAddress || 'unknown'}:${req.path}`;
-        const now = Date.now();
-        const bucket = simpleRateBuckets.get(key) || [];
-        const windowStart = now - windowMs;
-        const recentHits = bucket.filter(timestamp => timestamp >= windowStart);
-        recentHits.push(now);
-        simpleRateBuckets.set(key, recentHits);
-
-        if (recentHits.length > maxRequests) {
-            return res.status(429).json({ success: false, message: 'Too many requests. Please try again later.' });
-        }
-
-        next();
-    };
+    return rateLimit({
+        windowMs: Number(windowMs) || 60 * 1000,
+        max: Number(maxRequests) || 60,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { success: false, message: 'Too many requests. Please try again later.' },
+    });
 }
 
 const uploadRateLimiter = rateLimit({
@@ -450,10 +444,18 @@ async function validateCsvFile(filePath) {
 async function requestInferenceFromMlService(csvPath) {
     const serviceBaseUrl = (process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
     const endpoint = new URL('/predict', serviceBaseUrl);
+    // Send the CSV file as multipart/form-data to the ML service so the two
+    // services do not need to share a filesystem path.
+    const fullPath = path.join(__dirname, '../ml-pipeline', csvPath);
+    const form = new FormData();
+    form.append('file', fs.createReadStream(fullPath));
+    // allow optional output_path to be empty
+    form.append('output_path', '');
+
     const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv_path: csvPath }),
+        body: form,
+        headers: form.getHeaders(),
         signal: AbortSignal.timeout(600000),
     });
 
@@ -494,31 +496,36 @@ async function persistInferenceResults(fileHash, originalFileName, predictionPay
         { returnDocument: 'after' }
     );
 
-    const hydratedAlerts = predictionPayload.data.map(alert => ({
-        ...alert,
-        sourceFileName: originalFileName,
-        kycData: {
-            fullName: faker.person.fullName(),
-            email: faker.internet.email(),
-            phone: faker.phone.number(),
-            currentBalance: faker.finance.amount({ min: 50, max: 150000, dec: 2, symbol: '$' }),
-            lastLoginIp: faker.internet.ipv4(),
-            deviceType: faker.helpers.arrayElement(['iPhone 14 Pro', 'Windows 11 PC', 'MacBook Air', 'Android (Unknown)', 'Linux Server']),
-            recentTransactions: Array.from({ length: 3 }).map(() => ({
-                txnId: faker.string.uuid().slice(0, 8).toUpperCase(),
-                amount: faker.finance.amount({ min: 1000, max: 9500, dec: 2, symbol: '$' }),
-                type: faker.helpers.arrayElement(['WIRE_TRANSFER', 'CRYPTO_EXCHANGE', 'P2P_PAYMENT', 'OFFSHORE_DEPOSIT']),
-                date: faker.date.recent({ days: 3 })
-            }))
-        }
-    }));
+    // Process incoming payload in bounded batches and hydrate each batch with
+    // Faker-generated kyc data to avoid allocating the entire dataset in memory.
+    const incoming = Array.isArray(predictionPayload.data) ? predictionPayload.data : [];
+    let criticalCount = 0;
+    let highRiskCount = 0;
+    const batchSize = 5000;
+    const totalBatches = Math.ceil(incoming.length / batchSize);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        const rawChunk = incoming.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+        const hydratedChunk = rawChunk.map(alert => ({
+            ...alert,
+            sourceFileName: originalFileName,
+            kycData: {
+                fullName: faker.person.fullName(),
+                email: faker.internet.email(),
+                phone: faker.phone.number(),
+                currentBalance: faker.finance.amount({ min: 50, max: 150000, dec: 2, symbol: '$' }),
+                lastLoginIp: faker.internet.ipv4(),
+                deviceType: faker.helpers.arrayElement(['iPhone 14 Pro', 'Windows 11 PC', 'MacBook Air', 'Android (Unknown)', 'Linux Server']),
+                recentTransactions: Array.from({ length: 3 }).map(() => ({
+                    txnId: faker.string.uuid().slice(0, 8).toUpperCase(),
+                    amount: faker.finance.amount({ min: 1000, max: 9500, dec: 2, symbol: '$' }),
+                    type: faker.helpers.arrayElement(['WIRE_TRANSFER', 'CRYPTO_EXCHANGE', 'P2P_PAYMENT', 'OFFSHORE_DEPOSIT']),
+                    date: faker.date.recent({ days: 3 })
+                }))
+            }
+        }));
 
-    if (hydratedAlerts.length > 0) {
-        const batchSize = 5000;
-        const totalBatches = Math.ceil(hydratedAlerts.length / batchSize);
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
-            const chunk = hydratedAlerts.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
-            const ops = chunk.map(alert => ({
+        if (hydratedChunk.length > 0) {
+            const ops = hydratedChunk.map(alert => ({
                 updateOne: {
                     filter: { accountId: alert.accountId, sourceFileName: alert.sourceFileName },
                     update: { $set: alert },
@@ -529,10 +536,13 @@ async function persistInferenceResults(fileHash, originalFileName, predictionPay
             emitEngineProgress(currentEngineStatus);
             await Alert.bulkWrite(ops, { ordered: false });
         }
-    }
 
-    const criticalCount = hydratedAlerts.filter(a => a.status === 'Critical').length;
-    const highRiskCount = hydratedAlerts.filter(a => a.status === 'High Risk').length;
+        // Tally counts from this hydrated chunk
+        for (const a of hydratedChunk) {
+            if (a.status === 'Critical') criticalCount += 1;
+            if (a.status === 'High Risk') highRiskCount += 1;
+        }
+    }
 
     if (criticalCount > 0 || highRiskCount > 0) {
         io.emit('SCAN_COMPLETE', {
@@ -568,31 +578,35 @@ async function persistLiveBatchResults(batchHash, batchLabel, predictionPayload)
         { upsert: true, returnDocument: 'after' }
     );
 
-    const hydratedAlerts = predictionPayload.data.map(alert => ({
-        ...alert,
-        sourceFileName: batchLabel,
-        kycData: {
-            fullName: faker.person.fullName(),
-            email: faker.internet.email(),
-            phone: faker.phone.number(),
-            currentBalance: faker.finance.amount({ min: 50, max: 150000, dec: 2, symbol: '$' }),
-            lastLoginIp: faker.internet.ipv4(),
-            deviceType: faker.helpers.arrayElement(['iPhone 14 Pro', 'Windows 11 PC', 'MacBook Air', 'Android (Unknown)', 'Linux Server']),
-            recentTransactions: Array.from({ length: 3 }).map(() => ({
-                txnId: faker.string.uuid().slice(0, 8).toUpperCase(),
-                amount: faker.finance.amount({ min: 1000, max: 9500, dec: 2, symbol: '$' }),
-                type: faker.helpers.arrayElement(['WIRE_TRANSFER', 'CRYPTO_EXCHANGE', 'P2P_PAYMENT', 'OFFSHORE_DEPOSIT']),
-                date: faker.date.recent({ days: 3 })
-            }))
-        }
-    }));
+    // Process live batch payload in bounded chunks and hydrate on-the-fly.
+    const incoming = Array.isArray(predictionPayload.data) ? predictionPayload.data : [];
+    let criticalCount = 0;
+    let highRiskCount = 0;
+    const batchSize = 5000;
+    const totalBatches = Math.ceil(incoming.length / batchSize);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        const rawChunk = incoming.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+        const hydratedChunk = rawChunk.map(alert => ({
+            ...alert,
+            sourceFileName: batchLabel,
+            kycData: {
+                fullName: faker.person.fullName(),
+                email: faker.internet.email(),
+                phone: faker.phone.number(),
+                currentBalance: faker.finance.amount({ min: 50, max: 150000, dec: 2, symbol: '$' }),
+                lastLoginIp: faker.internet.ipv4(),
+                deviceType: faker.helpers.arrayElement(['iPhone 14 Pro', 'Windows 11 PC', 'MacBook Air', 'Android (Unknown)', 'Linux Server']),
+                recentTransactions: Array.from({ length: 3 }).map(() => ({
+                    txnId: faker.string.uuid().slice(0, 8).toUpperCase(),
+                    amount: faker.finance.amount({ min: 1000, max: 9500, dec: 2, symbol: '$' }),
+                    type: faker.helpers.arrayElement(['WIRE_TRANSFER', 'CRYPTO_EXCHANGE', 'P2P_PAYMENT', 'OFFSHORE_DEPOSIT']),
+                    date: faker.date.recent({ days: 3 })
+                }))
+            }
+        }));
 
-    if (hydratedAlerts.length > 0) {
-        const batchSize = 5000;
-        const totalBatches = Math.ceil(hydratedAlerts.length / batchSize);
-        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
-            const chunk = hydratedAlerts.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
-            const ops = chunk.map(alert => ({
+        if (hydratedChunk.length > 0) {
+            const ops = hydratedChunk.map(alert => ({
                 updateOne: {
                     filter: { accountId: alert.accountId, sourceFileName: alert.sourceFileName },
                     update: { $set: alert },
@@ -603,10 +617,12 @@ async function persistLiveBatchResults(batchHash, batchLabel, predictionPayload)
             emitEngineProgress(currentEngineStatus);
             await Alert.bulkWrite(ops, { ordered: false });
         }
-    }
 
-    const criticalCount = hydratedAlerts.filter(a => a.status === 'Critical').length;
-    const highRiskCount = hydratedAlerts.filter(a => a.status === 'High Risk').length;
+        for (const a of hydratedChunk) {
+            if (a.status === 'Critical') criticalCount += 1;
+            if (a.status === 'High Risk') highRiskCount += 1;
+        }
+    }
 
     if (criticalCount > 0 || highRiskCount > 0) {
         io.emit('LIVE_STREAM_COMPLETE', {
@@ -660,8 +676,39 @@ const liveStreamProcessor = createLiveStreamProcessor({
 
 app.get('/api/alerts', async (req, res) => {
     try {
-        const alerts = await Alert.find().sort({ riskScore: -1 }).lean();
-        res.json({ success: true, count: alerts.length, data: alerts });
+            const page = Math.max(1, Number.parseInt(req.query.page || '1', 10));
+            const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit || '12', 10)));
+            const skip = (page - 1) * limit;
+
+            // Filters
+            const q = {};
+            const dataset = req.query.dataset;
+            const status = req.query.status; // e.g., 'Critical' or 'High Risk'
+            const search = req.query.search; // free text search on accountId or feature name
+
+            if (dataset && dataset !== 'ALL') {
+                q.sourceFileName = dataset;
+            }
+
+            if (status && status !== 'ALL') {
+                q.status = status;
+            }
+
+            if (search && String(search).trim()) {
+                const s = String(search).trim();
+                // match accountId or topFeatures.name
+                q.$or = [
+                    { accountId: { $regex: s, $options: 'i' } },
+                    { 'topFeatures.name': { $regex: s, $options: 'i' } },
+                ];
+            }
+
+            const [total, data] = await Promise.all([
+                Alert.countDocuments(q),
+                Alert.find(q).sort({ riskScore: -1 }).skip(skip).limit(limit).lean(),
+            ]);
+
+            res.json({ success: true, total, page, limit, data });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 

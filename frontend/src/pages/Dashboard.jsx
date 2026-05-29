@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
@@ -403,6 +403,7 @@ const Dashboard = () => {
     const [perUploadMB, setPerUploadMB] = useState(100);
     const [currentPage, setCurrentPage]             = useState(1);
     const [resolvedIds, setResolvedIds]             = useState(new Set());
+    const [totalAlertsCount, setTotalAlertsCount]   = useState(0);
     const [sidebarCollapsed, setSidebarCollapsed]   = useState(false);
     const [modelConfig, setModelConfig]             = useState(null);
     const [inputSchema, setInputSchema]             = useState(null);
@@ -438,7 +439,22 @@ const Dashboard = () => {
         return response.json();
     };
 
-    const fetchAlerts     = async () => { try { const data = await fetchJson('/api/alerts');   if (data) setAlerts(data.data); } catch {} };
+    const fetchAlerts = React.useCallback(async (page = 1, opts = {}) => {
+        try {
+            const params = new URLSearchParams();
+            params.set('page', String(page));
+            params.set('limit', String(itemsPerPage));
+            if (opts.dataset && opts.dataset !== 'ALL') params.set('dataset', opts.dataset);
+            if (opts.status && opts.status !== 'ALL') params.set('status', opts.status);
+            if (opts.search && String(opts.search).trim()) params.set('search', String(opts.search).trim());
+
+            const data = await fetchJson(`/api/alerts?${params.toString()}`);
+            if (data) {
+                setAlerts(data.data || []);
+                setTotalAlertsCount(Number(data.total || data.count || (data.data || []).length));
+            }
+        } catch (e) { /* ignore */ }
+    }, [itemsPerPage]);
     const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch {} };
     const fetchModelConfig = async () => {
         try {
@@ -490,7 +506,7 @@ const Dashboard = () => {
                 </div>
             ), { duration:8000, position:'top-right' });
         });
-        socket.on('SILENT_REFRESH', () => { fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); });
+        socket.on('SILENT_REFRESH', () => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
         socket.on('SYNC_STATE', (state) => {
             try {
@@ -509,12 +525,12 @@ const Dashboard = () => {
                     if (terminal.includes(payload.status)) {
                         setIsUploading(false);
                         if (statusInterval.current) { clearInterval(statusInterval.current); statusInterval.current = null; }
-                        fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+                        fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
                     }
                 }
             } catch (e) {}
         });
-        fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+        fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
         socketRefLocal.current = socket;
         return () => { socket.disconnect(); socketRefLocal.current = null; };
     }, []);
@@ -536,6 +552,11 @@ const Dashboard = () => {
     }, []);
 
     useEffect(() => { setCurrentPage(1); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset, datasetSourceFilter]);
+
+    // When current page changes, ask the server for the corresponding page.
+    useEffect(() => {
+        fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm });
+    }, [currentPage, activeDataset, activeTab, searchTerm, fetchAlerts]);
 
     useEffect(() => {
         const visibleDatasets = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || (file.sourceType || (String(file.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST')) === datasetSourceFilter);
@@ -559,7 +580,7 @@ const Dashboard = () => {
                         statusInterval.current = null;
                         setIsUploading(false);
                         setUploadStartedAt(null);
-                        fetchAlerts(); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
+                        fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig();
 
                         if (data.status === 'Complete') {
                             toast.success(`Finished processing ${uploadFileName || 'the upload'}.`, {
@@ -668,16 +689,16 @@ const Dashboard = () => {
 
     // ── Derived ────────────────────────────────────────────────────────────────
     const resolveSourceType = (file) => file?.sourceType || (String(file?.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST');
-    const visibleDatasetFiles = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || resolveSourceType(file) === datasetSourceFilter);
-    const visibleDatasetNames = new Set(visibleDatasetFiles.map(file => file.fileName));
-    const unresolvedAlerts = alerts.filter(a => !resolvedIds.has(a.accountId));
-    const activeAlerts     = unresolvedAlerts.filter(a => {
+    const visibleDatasetFiles = useMemo(() => availableDatasets.filter(file => datasetSourceFilter === 'ALL' || resolveSourceType(file) === datasetSourceFilter), [availableDatasets, datasetSourceFilter]);
+    const visibleDatasetNames = useMemo(() => new Set(visibleDatasetFiles.map(file => file.fileName)), [visibleDatasetFiles]);
+    const unresolvedAlerts = useMemo(() => alerts.filter(a => !resolvedIds.has(a.accountId)), [alerts, resolvedIds]);
+    const activeAlerts = useMemo(() => unresolvedAlerts.filter(a => {
         const matchesDataset = activeDataset === 'ALL' || a.sourceFileName === activeDataset;
         const matchesSource = datasetSourceFilter === 'ALL' || visibleDatasetNames.has(a.sourceFileName);
         return matchesDataset && matchesSource;
-    });
+    }), [unresolvedAlerts, activeDataset, datasetSourceFilter, visibleDatasetNames]);
 
-    const filteredAlerts = activeAlerts.filter(a => {
+    const filteredAlerts = useMemo(() => activeAlerts.filter(a => {
         const tab = activeTab === 'ALL' || (activeTab === 'CRITICAL' && a.status === 'Critical') || (activeTab === 'HIGH_RISK' && a.status === 'High Risk');
         const search = !searchTerm ? true : searchType === 'ACCOUNT_ID'
             ? a.accountId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -687,11 +708,10 @@ const Dashboard = () => {
                 return fname.toLowerCase().includes(searchTerm.toLowerCase()) || translate(fname).toLowerCase().includes(searchTerm.toLowerCase());
             });
         return tab && search;
-    });
+    }), [activeAlerts, activeTab, searchTerm, searchType]);
 
-    const totalPages    = Math.ceil(filteredAlerts.length / itemsPerPage);
-    const idx0          = (currentPage - 1) * itemsPerPage;
-    const currentAlerts = filteredAlerts.slice(idx0, idx0 + itemsPerPage);
+    const totalPages    = Math.max(1, Math.ceil(totalAlertsCount / itemsPerPage));
+    const currentAlerts = filteredAlerts; // server provides paged alerts for current page
 
     const filteredLogs   = logs.filter(l => activeLogTab === 'ALL' || l.actor === activeLogTab);
     const totalLogPages  = Math.ceil(filteredLogs.length / itemsPerPage);
@@ -718,15 +738,18 @@ const Dashboard = () => {
     const riskData    = [{ name:'Critical', value:critCount }, { name:'High Risk', value:highCount }];
     const CHART_CLRS  = [T.crit, T.high];
 
-    const featureCounts = {};
-    activeAlerts.forEach(a => getAlertFeatures(a).forEach(fObj => { 
-        const f = fObj.name;
-        featureCounts[f] = (featureCounts[f] || 0) + 1; 
-    }));
-    
-    const featureData = Object.keys(featureCounts)
+    const featureCounts = useMemo(() => {
+        const counts = {};
+        activeAlerts.forEach(a => getAlertFeatures(a).forEach(fObj => {
+            const f = fObj.name;
+            counts[f] = (counts[f] || 0) + 1;
+        }));
+        return counts;
+    }, [activeAlerts]);
+
+    const featureData = useMemo(() => Object.keys(featureCounts)
         .map(k => ({ name: k === 'Anomaly_Score' ? 'STAT' : k, count: featureCounts[k], fullName: translate(k) }))
-        .sort((a, b) => b.count - a.count).slice(0, 6);
+        .sort((a, b) => b.count - a.count).slice(0, 6), [featureCounts]);
 
     const inputSchemaLabel = inputSchema?.type === 'transaction_graph'
         ? 'Transaction Graph'
