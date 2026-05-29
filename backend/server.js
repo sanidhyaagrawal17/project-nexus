@@ -10,7 +10,6 @@ const { faker } = require('@faker-js/faker');
 const http = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
-const FormData = require('form-data');
 const { pipeline } = require('stream/promises');
 
 const Alert = require('./models/Alert');
@@ -20,6 +19,7 @@ const AnalystFeedback = require('./models/AnalystFeedback');
 const Setting = require('./models/Setting');
 const { createLiveStreamProcessor } = require('./liveStreamProcessor');
 const { startRetrainScheduler, stopRetrainScheduler } = require('./scheduler');
+const { spawn } = require('child_process');
 
 const app = express();
 const PORT = Number.parseInt(process.env.PORT || '5000', 10);
@@ -44,7 +44,8 @@ const activeChildProcesses = new Set();
 
 const MAX_JSON_BODY_SIZE = process.env.MAX_JSON_BODY_SIZE || '100mb';
 const MAX_URLENCODED_BODY_SIZE = process.env.MAX_URLENCODED_BODY_SIZE || '100mb';
-let maxUploadSizeMB = Number.parseInt(process.env.MAX_UPLOAD_SIZE_MB || '100', 10);
+const rawEnvMB = String(process.env.MAX_UPLOAD_SIZE_MB || '100').replace(/[^0-9]/g, '');
+let maxUploadSizeMB = Number.parseInt(rawEnvMB || '100', 10);
 let uploadLimitEnabled = (typeof process.env.UPLOAD_LIMIT_ENABLED === 'undefined') ? true : String(process.env.UPLOAD_LIMIT_ENABLED).toLowerCase() !== 'false';
 
 function isAllowedOrigin(origin) {
@@ -77,6 +78,19 @@ app.use(cors({
 }));
 app.use(express.json({ limit: MAX_JSON_BODY_SIZE }));
 app.use(express.urlencoded({ limit: MAX_URLENCODED_BODY_SIZE, extended: true }));
+
+// Simple role check middleware for Admin-only endpoints
+function requireAdmin(req, res, next) {
+    try {
+        const role = String(req.get('X-User-Role') || '').trim();
+        if (role !== 'Admin') {
+            return res.status(403).json({ success: false, message: 'Forbidden: admin role required' });
+        }
+        return next();
+    } catch (err) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+}
 
 // API navigation guard:
 // - If a human navigates directly to an `/api/*` URL in the browser (Accept: text/html),
@@ -266,6 +280,8 @@ process.once('SIGINT', () => {
 });
 
 const metricsPath = path.join(__dirname, '../ml-pipeline/outputs/model_metrics.json');
+const diagOutputsDir = path.join(__dirname, '../ml-pipeline/outputs');
+const DIAG_THRESHOLD_MS = Number.parseInt(process.env.DIAG_THRESHOLD_MS || String(60 * 1000), 10);
 
 // Track socket connections per remote address and limit to prevent resource exhaustion
 const socketCountsByAddress = new Map();
@@ -415,6 +431,81 @@ function readJsonFileSafe(filePath) {
     return null;
 }
 
+async function gatherScoringDiagnostics({ fileHash, fullPath, originalFileName } = {}) {
+    try {
+        const timestamp = Date.now();
+        const note = {
+            timestamp,
+            fileHash: fileHash || null,
+            originalFileName: originalFileName || null,
+            nodePid: process.pid,
+            memory: process.memoryUsage(),
+            dbReady: Boolean(dbReady),
+            env: { ML_SERVICE_URL: process.env.ML_SERVICE_URL || null },
+            file: null,
+            hostDns: null,
+            healthChecks: [],
+        };
+
+        // file stats and preview
+        if (fullPath && fs.existsSync(fullPath)) {
+            try {
+                const st = await fs.promises.stat(fullPath);
+                note.file = { path: fullPath, size: st.size, mtime: st.mtimeMs };
+                const raw = await fs.promises.readFile(fullPath, { encoding: 'utf8' });
+                note.file.preview = raw.split(/\r?\n/).slice(0, 20);
+            } catch (e) { note.filePreviewError = String(e && e.message ? e.message : e); }
+        }
+
+        // DNS / health checks for common candidates
+        const candidates = [];
+        if (process.env.ML_SERVICE_URL) candidates.push(String(process.env.ML_SERVICE_URL).replace(/\/$/, ''));
+        candidates.push('http://ml-pipeline:8000');
+        candidates.push('http://127.0.0.1:8000');
+
+        const dns = require('dns').promises;
+        for (const base of candidates) {
+            try {
+                const url = new URL('/healthz', base);
+                const host = url.hostname;
+                try {
+                    const lookup = await dns.lookup(host).catch(() => null);
+                    note.hostDns = note.hostDns || {};
+                    note.hostDns[host] = lookup || null;
+                } catch (e) { note.hostDns = note.hostDns || {}; note.hostDns[host] = String(e && e.message ? e.message : e); }
+
+                try {
+                    const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(5000) });
+                    const txt = await res.text().catch(() => null);
+                    note.healthChecks.push({ base, status: res.status, body: typeof txt === 'string' && txt.length ? txt.slice(0, 200) : null });
+                } catch (e) {
+                    note.healthChecks.push({ base, error: String(e && e.message ? e.message : e) });
+                }
+            } catch (err) {
+                note.healthChecks.push({ base, error: String(err && err.message ? err.message : err) });
+            }
+        }
+
+        // ensure outputs dir exists
+        try { await fs.promises.mkdir(diagOutputsDir, { recursive: true }); } catch {}
+        const outPath = path.join(diagOutputsDir, `diagnostics_${timestamp}.json`);
+        await fs.promises.writeFile(outPath, JSON.stringify(note, null, 2), 'utf8');
+
+        // Emit socket event and system log so analysts see the diag
+        try { io.emit('ENGINE_DIAG', { fileHash, originalFileName, path: outPath }); } catch {}
+        await createLog('SYSTEM', 'DIAG', `Diagnostics captured for ${originalFileName || fileHash || 'unknown'} -> ${outPath}`);
+        console.log('[+] Diagnostics written to', outPath);
+        return outPath;
+    } catch (err) {
+        console.error('[!] Failed to gather scoring diagnostics:', err && err.message ? err.message : err);
+    }
+}
+
+// small utility sleep
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function hashFileSha256(filePath) {
     const hash = crypto.createHash('sha256');
     await pipeline(fs.createReadStream(filePath), hash);
@@ -442,29 +533,91 @@ async function validateCsvFile(filePath) {
 }
 
 async function requestInferenceFromMlService(csvPath) {
-    const serviceBaseUrl = (process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-    const endpoint = new URL('/predict', serviceBaseUrl);
-    // Send the CSV file as multipart/form-data to the ML service so the two
-    // services do not need to share a filesystem path.
+    const candidates = [];
+    if (process.env.ML_SERVICE_URL) candidates.push(String(process.env.ML_SERVICE_URL).replace(/\/$/, ''));
+    // Common service hostnames to try inside Docker networks
+    candidates.push('http://ml-pipeline:8000');
+    candidates.push('http://127.0.0.1:8000');
+
     const fullPath = path.join(__dirname, '../ml-pipeline', csvPath);
-    const form = new FormData();
-    form.append('file', fs.createReadStream(fullPath));
-    // allow optional output_path to be empty
-    form.append('output_path', '');
+    let lastErr = null;
 
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        body: form,
-        headers: form.getHeaders(),
-        signal: AbortSignal.timeout(600000),
-    });
+    for (const base of candidates) {
+        const endpoint = new URL('/predict', base);
+        // try a few retries for transient network/DNS failures per candidate
+        let attempt = 0;
+        const maxAttempts = 3;
+        while (attempt < maxAttempts) {
+            attempt += 1;
+            try {
+                // First try: ask the ML service to read the already-written CSV by sending csv_path
+                const params = new URLSearchParams();
+                params.append('csv_path', csvPath);
+                params.append('output_path', '');
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`ML service request failed (${response.status}): ${errorText}`);
+                console.log(`[+] ML request attempt #${attempt} to ${endpoint.toString()} with csv_path=${csvPath}`);
+
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    body: params,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    signal: AbortSignal.timeout(600000),
+                });
+
+                const txt = await res.text();
+                if (res.ok) {
+                    try { return JSON.parse(txt); } catch (e) { return JSON.parse(await Promise.resolve(txt)); }
+                }
+
+                // If the service explicitly asks for a file or csv_path, attempt multipart upload fallback
+                if (res.status === 400 && String(txt || '').toLowerCase().includes('either file or csv_path must be provided')) {
+                    try {
+                        console.log('[+] ML service requested multipart upload; attempting native FormData file upload fallback');
+                        const fileBuffer = await fs.promises.readFile(fullPath);
+                        const form = new globalThis.FormData();
+                        const blob = new globalThis.Blob([fileBuffer], { type: 'text/csv' });
+                        form.append('file', blob, path.basename(fullPath));
+                        form.append('output_path', '');
+
+                        const resp = await fetch(endpoint, {
+                            method: 'POST',
+                            body: form,
+                            signal: AbortSignal.timeout(600000),
+                        });
+
+                        const body = await resp.text();
+                        if (resp.ok) return JSON.parse(body);
+                        throw new Error(`Multipart ML service request failed (${resp.status}): ${body}`);
+                    } catch (multipartErr) {
+                        lastErr = multipartErr;
+                        console.error('[!] Multipart fallback failed:', multipartErr && multipartErr.message ? multipartErr.message : multipartErr);
+                        // try next candidate
+                        break; // break retry loop and move to next base
+                    }
+                }
+
+                // Otherwise, return the error payload
+                throw new Error(`ML service request failed (${res.status}): ${txt}`);
+            } catch (err) {
+                const msg = err && err.message ? err.message : String(err);
+                console.error(`[!] Failed ML request attempt #${attempt} to ${base}:`, msg);
+                lastErr = err;
+                // If DNS lookup failed, wait a bit and retry; otherwise break
+                if (msg.toLowerCase().includes('getaddrinfo') || msg.toLowerCase().includes('enotfound') || msg.toLowerCase().includes('econnrefused')) {
+                    if (attempt < maxAttempts) {
+                        await sleep(500 * attempt);
+                        continue; // retry same candidate
+                    }
+                }
+                // non-retriable or exhausted attempts: move to next candidate
+                break;
+            }
+        }
+        // try next base candidate
+        continue;
     }
 
-    return response.json();
+    throw lastErr || new Error('ML service request failed: no candidates succeeded');
 }
 
 async function requestLiveInferenceFromMlService(events) {
@@ -785,7 +938,12 @@ app.get('/api/metrics', (req, res) => {
     res.json({ success: true, data: metrics });
 });
 
-app.delete('/api/system-wipe', createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 3 }), async (req, res) => {
+
+
+// Protect system-wipe: admin-only
+// Re-register the route with requireAdmin
+app.delete('/api/system-wipe', requireAdmin, createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 3 }), async (req, res) => {
+    // delegate to existing handler by calling same logic (kept simple duplication for clarity)
     try {
         await Alert.deleteMany({});
         await ProcessedFile.deleteMany({});
@@ -806,8 +964,8 @@ app.delete('/api/system-wipe', createSimpleRateLimit({ windowMs: 15 * 60 * 1000,
 
         await createLog('SYSTEM', 'RESOLUTION', 'Master System Wipe Executed. Databases and physical files completely scrubbed.');
         io.emit('SILENT_REFRESH');
-        res.json({ success: true, message: 'System Wiped Successfully' });
-    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+        return res.json({ success: true, message: 'System Wiped Successfully' });
+    } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 });
 
 app.post('/api/resolve', createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 60 }), async (req, res) => {
@@ -881,28 +1039,53 @@ app.post('/api/upload', uploadRateLimiter, async (req, res) => {
 
             void (async () => {
                 try {
-                    const predictionPayload = await requestInferenceFromMlService(targetCsvPath);
+                    // Start a diagnostics timer: if scoring takes longer than DIAG_THRESHOLD_MS,
+                    // gather system/file/health diagnostics for investigation.
+                    let diagTimer = null;
+                    let diagFired = false;
+                    try {
+                        diagTimer = setTimeout(async () => {
+                            diagFired = true;
+                            try { await gatherScoringDiagnostics({ fileHash, fullPath, originalFileName }); } catch (e) { console.error('[!] diag timer error', e); }
+                        }, DIAG_THRESHOLD_MS);
 
-                    if (!predictionPayload || Number(predictionPayload.totalScanned || 0) <= 0) {
-                        await ProcessedFile.deleteOne({ fileHash });
-                        await fs.promises.unlink(fullPath).catch(() => {});
+                        const predictionPayload = await requestInferenceFromMlService(targetCsvPath);
+                        // clear diag timer if finished in time
+                        if (diagTimer) { clearTimeout(diagTimer); diagTimer = null; }
+
+                        // proceed with handling predictionPayload as before
+                        
+                        if (!predictionPayload || Number(predictionPayload.totalScanned || 0) <= 0) {
+                            await ProcessedFile.deleteOne({ fileHash });
+                            await fs.promises.unlink(fullPath).catch(() => {});
+                            currentEngineStatus = 'Engine Failure';
+                            emitEngineProgress(currentEngineStatus);
+                            await createLog('SYSTEM', 'REJECTION', `Upload rejected: ${originalFileName} did not contain any parsable CSV rows.`);
+                            return;
+                        }
+
+                        currentEngineStatus = 'Committing to NoSQL Database...';
+                        emitEngineProgress(currentEngineStatus);
+
+                        await persistInferenceResults(fileHash, originalFileName, predictionPayload);
+
+                        currentEngineStatus = 'Complete';
+                        emitEngineProgress(currentEngineStatus);
+                    } finally {
+                        if (diagTimer) { clearTimeout(diagTimer); }
+                    }
+                    
+                } catch (error) {
+                    try {
+                        console.error('[!] ML Service Error:', error);
                         currentEngineStatus = 'Engine Failure';
                         emitEngineProgress(currentEngineStatus);
-                        await createLog('SYSTEM', 'REJECTION', `Upload rejected: ${originalFileName} did not contain any parsable CSV rows.`);
-                        return;
+                        const message = (error && error.message) ? error.message : String(error || 'Unknown ML service error');
+                        try { io.emit('ENGINE_ERROR', { message }); } catch (emitErr) { console.error('[!] Failed to emit ENGINE_ERROR:', emitErr); }
+                        await createLog('SYSTEM', 'ERROR', `ML Service Error: ${message}`);
+                    } catch (innerErr) {
+                        console.error('[!] Failed handling ML Service Error:', innerErr);
                     }
-
-                    currentEngineStatus = 'Committing to NoSQL Database...';
-                    emitEngineProgress(currentEngineStatus);
-
-                    await persistInferenceResults(fileHash, originalFileName, predictionPayload);
-
-                    currentEngineStatus = 'Complete';
-                    emitEngineProgress(currentEngineStatus);
-                } catch (error) {
-                    console.error('[!] ML Service Error:', error);
-                    currentEngineStatus = 'Engine Failure';
-                    emitEngineProgress(currentEngineStatus);
                 }
             })();
         } catch (hashErr) {
@@ -933,8 +1116,20 @@ async function bootstrap() {
         try {
             const s = await Setting.findOne({ key: 'uploadConfig' }).lean();
             if (s && s.value) {
-                if (typeof s.value.maxUploadMB === 'number') maxUploadSizeMB = s.value.maxUploadMB;
-                if (typeof s.value.enabled === 'boolean') uploadLimitEnabled = s.value.enabled;
+                let val = s.value;
+                if (typeof val === 'string') {
+                    try { val = JSON.parse(val); } catch (e) { /* not JSON, keep as string */ }
+                }
+                if (val && typeof val === 'object') {
+                    // maxUploadMB may be a number or a string like "1000" or "1GB"; normalize to integer MB
+                    if (typeof val.maxUploadMB === 'number') {
+                        maxUploadSizeMB = val.maxUploadMB;
+                    } else if (typeof val.maxUploadMB === 'string') {
+                        const digits = String(val.maxUploadMB).replace(/[^0-9]/g, '');
+                        if (digits) maxUploadSizeMB = Number.parseInt(digits, 10);
+                    }
+                    if (typeof val.enabled === 'boolean') uploadLimitEnabled = val.enabled;
+                }
                 console.log(` [+] Loaded uploadConfig from DB: maxUploadMB=${maxUploadSizeMB}, enabled=${uploadLimitEnabled}`);
             }
         } catch (err) { console.error('[!] Failed to load uploadConfig from DB:', err && err.message ? err.message : err); }
@@ -956,7 +1151,7 @@ app.get('/api/upload-config', (req, res) => {
     res.json({ success: true, maxUploadMB: Number.isFinite(maxUploadSizeMB) ? maxUploadSizeMB : null, enabled: Boolean(uploadLimitEnabled) });
 });
 
-app.post('/api/upload-config', async (req, res) => {
+app.post('/api/upload-config', requireAdmin, async (req, res) => {
     try {
         const { maxUploadMB, enabled } = req.body || {};
         if (typeof enabled === 'boolean') uploadLimitEnabled = enabled;
@@ -972,11 +1167,11 @@ app.post('/api/upload-config', async (req, res) => {
 
         // Persist to DB so settings survive restarts
         try {
-            await Setting.updateOne(
-                { key: 'uploadConfig' },
-                { $set: { value: { maxUploadMB: maxUploadSizeMB, enabled: uploadLimitEnabled }, updatedAt: new Date() } },
-                { upsert: true }
-            );
+                await Setting.updateOne(
+                    { key: 'uploadConfig' },
+                    { $set: { value: JSON.stringify({ maxUploadMB: maxUploadSizeMB, enabled: uploadLimitEnabled }), updatedAt: new Date() } },
+                    { upsert: true }
+                );
         } catch (err) {
             console.error('[!] Failed to persist uploadConfig to DB:', err && err.message ? err.message : err);
         }
@@ -1004,4 +1199,47 @@ app.use((err, req, res, next) => {
     // fallback for other errors — log and pass through
     console.error('[!] Unhandled error in request pipeline:', err && err.stack ? err.stack : err);
     return res.status(500).json({ success: false, message: err && err.message ? err.message : 'Internal Server Error' });
+});
+
+// Analyst: mark an alert's mule status
+app.put('/api/alerts/:id/mule', createSimpleRateLimit({ windowMs: 60 * 1000, maxRequests: 30 }), async (req, res) => {
+    try {
+        const { id } = req.params;
+        // allow JSON body, form-encoded, query param or header fallback for convenience
+        const fromBody = (req.body && req.body.muleStatus) ? String(req.body.muleStatus) : null;
+        const fromQuery = req.query && req.query.muleStatus ? String(req.query.muleStatus) : null;
+        const fromHeader = req.get('X-Mule-Status') ? String(req.get('X-Mule-Status')) : null;
+        const muleStatus = fromBody || fromQuery || fromHeader || null;
+        const allowed = ['Pending', 'Confirmed Mule', 'Not a Mule'];
+        if (!muleStatus || !allowed.includes(muleStatus)) return res.status(400).json({ success: false, message: 'Invalid muleStatus' });
+
+        const alert = await Alert.findByIdAndUpdate(id, { $set: { muleStatus } }, { new: true }).lean();
+        if (!alert) return res.status(404).json({ success: false, message: 'Alert not found' });
+
+        await createLog('ANALYST', 'MULE', `Analyst marked account ${alert.accountId} as ${muleStatus}`, alert.accountId);
+        try { io.emit('MULE_UPDATED', alert); } catch (e) { /* ignore */ }
+        return res.json({ success: true, data: alert });
+    } catch (err) {
+        console.error('[!] Failed to update mule status:', err && err.message ? err.message : err);
+        return res.status(500).json({ success: false, message: err && err.message ? err.message : 'Failed to update mule status' });
+    }
+});
+
+// Admin: trigger an immediate retrain job
+app.post('/api/retrain', requireAdmin, async (req, res) => {
+    try {
+        const scriptPath = path.join(__dirname, '../ml-pipeline/retrain_cron.py');
+        const pythonExecutable = process.env.PYTHON_EXECUTABLE || 'python3';
+        const child = spawn(pythonExecutable, [scriptPath], {
+            cwd: path.join(__dirname, '..'), env: process.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+        });
+        registerActiveChildProcess(child);
+        child.stdout.on('data', d => process.stdout.write(`[retrain stdout] ${d.toString()}`));
+        child.stderr.on('data', d => process.stderr.write(`[retrain stderr] ${d.toString()}`));
+        await createLog('SYSTEM', 'RETRAIN', 'Manual retrain started by admin');
+        return res.status(202).json({ success: true, message: 'Retrain started' });
+    } catch (err) {
+        console.error('[!] Failed to start retrain:', err && err.message ? err.message : err);
+        return res.status(500).json({ success: false, message: 'Failed to start retrain' });
+    }
 });

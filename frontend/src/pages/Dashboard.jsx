@@ -387,6 +387,7 @@ const Dashboard = () => {
     const [uploadedFiles, setUploadedFiles]         = useState([]);
     const [availableDatasets, setAvailableDatasets] = useState([]);
     const [activeDataset, setActiveDataset]         = useState('ALL');
+    const [currentRole, setCurrentRole]             = useState('Analyst');
     const [loading, setLoading]                     = useState(true);
     const [isUploading, setIsUploading]             = useState(false);
     const [engineStatus, setEngineStatus]           = useState('Idle');
@@ -437,7 +438,9 @@ const Dashboard = () => {
     }, [isUploading, uploadStartedAt]);
 
     const fetchJson = async (endpoint, init) => {
-        const response = await fetch(`${API_BASE}${endpoint}`, init);
+        const mergedHeaders = { 'X-User-Role': currentRole, ...(init && init.headers ? init.headers : {}) };
+        const opts = { ...(init || {}), headers: mergedHeaders };
+        const response = await fetch(`${API_BASE}${endpoint}`, opts);
         if (!response.ok) return null;
         return response.json();
     };
@@ -458,6 +461,33 @@ const Dashboard = () => {
             }
         } catch { /* ignore */ }
     }, [itemsPerPage]);
+
+    const confirmMule = async (alertId, muleStatus = 'Confirmed Mule') => {
+        try {
+            if (!window.confirm(`Mark this account as ${muleStatus}?`)) return;
+            // capture previous status for undo
+            const prev = alerts.find(a => a._id === alertId)?.muleStatus || 'Pending';
+            const res = await fetchJson(`/api/alerts/${alertId}/mule`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muleStatus }) });
+            if (res && res.success) {
+                // update local alerts
+                setAlerts(prevA => prevA.map(a => (a._id === res.data._id ? res.data : a)));
+                toast.success((t) => (
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                        <div>{`Marked ${res.data.accountId} as ${muleStatus}`}</div>
+                        <button onClick={async () => {
+                            try {
+                                const undo = await fetchJson(`/api/alerts/${alertId}/mule`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ muleStatus: prev }) });
+                                if (undo && undo.success) setAlerts(prevA => prevA.map(a => (a._id === undo.data._id ? undo.data : a)));
+                                toast.dismiss(t.id);
+                            } catch { toast.error('Undo failed'); }
+                        }} style={{ padding:'6px 10px', borderRadius:6, background:T.surface, border:`1px solid ${T.borderHi}`, cursor:'pointer' }}>Undo</button>
+                    </div>
+                ));
+            } else {
+                toast.error('Failed to update mule status');
+            }
+        } catch (err) { console.error(err); toast.error('Failed to update mule status'); }
+    };
     const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch { /* ignore */ } };
     const fetchModelConfig = async () => {
         try {
@@ -533,6 +563,16 @@ const Dashboard = () => {
                 }
             } catch { /* ignore */ }
         });
+        socket.on('ENGINE_ERROR', (payload) => {
+            try {
+                const msg = (payload && payload.message) ? payload.message : 'Unknown engine error';
+                setIsUploading(false);
+                if (statusInterval.current) { clearInterval(statusInterval.current); statusInterval.current = null; }
+                setUploadStartedAt(null);
+                setUploadElapsedSeconds(0);
+                toast.error(`Engine Error: ${msg}`, { style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` }, duration: 8000 });
+            } catch (e) { /* ignore */ }
+        });
         setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm }); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
         socketRefLocal.current = socket;
         return () => { socket.disconnect(); socketRefLocal.current = null; };
@@ -542,9 +582,7 @@ const Dashboard = () => {
     useEffect(() => {
         (async () => {
             try {
-                const r = await fetch(`${API_BASE}/api/upload-config`);
-                if (!r.ok) return;
-                const j = await r.json();
+                const j = await fetchJson('/api/upload-config');
                 if (j && j.success) {
                     setMaxUploadMB(Number(j.maxUploadMB || 0));
                     setUploadLimitEnabled(Boolean(j.enabled));
@@ -627,7 +665,7 @@ const Dashboard = () => {
         setUploadStartedAt(Date.now());
         setUploadElapsedSeconds(0);
         startStatusTracking();
-        const uploadToastId = toast.loading(`Uploading ${file.name} and verifying the dataset hash...`, {
+                const uploadToastId = toast.loading(`Uploading ${file.name} and verifying the dataset hash...`, {
             style:{ background:T.raised, color:T.txt1, border:`1px solid ${T.borderHi}` },
         });
         const fd = new FormData(); fd.append('telemetryFile', file);
@@ -635,7 +673,7 @@ const Dashboard = () => {
         try {
                 // include optional per-upload override as query param
                 const qp = perUploadMB ? `?max_upload_mb=${encodeURIComponent(Number(perUploadMB))}` : '';
-                const res = await fetch(`${API_BASE}/api/upload${qp}`, { method:'POST', body:fd });
+                const res = await fetch(`${API_BASE}/api/upload${qp}`, { method:'POST', body:fd, headers: { 'X-User-Role': currentRole } });
             const data = await res.json();
             if (!res.ok) {
                 if (data.message === 'DUPLICATE_FILE') {
@@ -660,9 +698,8 @@ const Dashboard = () => {
     const saveUploadConfig = async () => {
         try {
             const body = { maxUploadMB: uploadLimitEnabled ? Number(maxUploadMB) : null, enabled: uploadLimitEnabled };
-            const r = await fetch(`${API_BASE}/api/upload-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            const j = await r.json();
-            if (r.ok && j && j.success) {
+            const j = await fetchJson('/api/upload-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (j && j.success) {
                 toast.success('Upload configuration saved.');
             } else {
                 toast.error('Failed to save upload configuration.');
@@ -877,7 +914,7 @@ const Dashboard = () => {
 
                 {/* Nav */}
                 <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
-                    {navItems.map(({ id, label, icon, badge }) => {
+                    {navItems.filter(n => !(n.id === 'SYSTEM_LOGS' && currentRole !== 'Admin')).map(({ id, label, icon, badge }) => {
                         const active = currentView === id;
                         return (
                             <button key={id} onClick={() => setCurrentView(id)}
@@ -996,6 +1033,14 @@ const Dashboard = () => {
                     </h1>
 
                     <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginRight:8 }}>
+                            <label style={{ fontSize:12, color:T.txt3 }}>Role</label>
+                            <select value={currentRole} onChange={e => setCurrentRole(e.target.value)}
+                                style={{ padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }}>
+                                <option value="Analyst">Analyst</option>
+                                <option value="Admin">Administrator</option>
+                            </select>
+                        </div>
                         <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px',
                             background:T.critBg, border:`1px solid ${T.critBdr}`, borderRadius:5 }}>
                             <span style={{ width:6, height:6, borderRadius:'50%', background:T.crit, flexShrink:0 }} />
@@ -1106,19 +1151,23 @@ const Dashboard = () => {
                                                     color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
                                                 Upload CSV
                                             </button>
-                                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                                <label style={{ fontSize:12, color:T.txt2, display:'flex', alignItems:'center', gap:8 }}>
-                                                    <input type="checkbox" checked={uploadLimitEnabled} onChange={e => setUploadLimitEnabled(e.target.checked)} />
-                                                    <span style={{ marginLeft:6 }}>Limit uploads</span>
-                                                </label>
-                                                <input type="number" min={1} value={maxUploadMB} onChange={e => setMaxUploadMB(e.target.value)}
-                                                    style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
-                                                <button onClick={saveUploadConfig} style={{ padding:'8px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.surface, color:T.txt1, cursor:'pointer' }}>Save</button>
-                                                <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:8 }}>
-                                                    <span style={{ fontSize:12, color:T.txt2 }}>Per-upload MB</span>
-                                                    <input type="number" min={1} value={perUploadMB} onChange={e => setPerUploadMB(e.target.value)}
+                                            {/* Configuration controls visible only to Admin */}
+                                            {currentRole === 'Admin' && (
+                                                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                                    <label style={{ fontSize:12, color:T.txt2, display:'flex', alignItems:'center', gap:8 }}>
+                                                        <input type="checkbox" checked={uploadLimitEnabled} onChange={e => setUploadLimitEnabled(e.target.checked)} />
+                                                        <span style={{ marginLeft:6 }}>Limit uploads</span>
+                                                    </label>
+                                                    <input type="number" min={1} value={maxUploadMB} onChange={e => setMaxUploadMB(e.target.value)}
                                                         style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
+                                                    <button onClick={saveUploadConfig} style={{ padding:'8px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.surface, color:T.txt1, cursor:'pointer' }}>Save</button>
+                                                    <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:8 }}>
+                                                        <span style={{ fontSize:12, color:T.txt2 }}>Per-upload MB</span>
+                                                        <input type="number" min={1} value={perUploadMB} onChange={e => setPerUploadMB(e.target.value)}
+                                                            style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
+                                                    </div>
                                                 </div>
+                                            )}
                                             </div>
                                             <button onClick={() => setCurrentView('ANALYTICS')}
                                                 style={{ padding:'10px 16px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.surface,
@@ -1507,7 +1556,12 @@ const Dashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td style={{ padding:'11px 16px' }}>
-                                                        <StatusChip status={alert.status} />
+                                                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                                            <StatusChip status={alert.status} />
+                                                            <span style={{ fontSize:11, color:T.txt3, padding:'4px 8px', borderRadius:6, border:`1px solid ${T.border}`, background:T.bg }}>
+                                                                {alert.muleStatus || 'Pending'}
+                                                            </span>
+                                                        </div>
                                                     </td>
                                                     <td style={{ padding:'11px 16px', minWidth:110 }}>
                                                         <div style={{ fontSize:15, fontWeight:700, fontFamily:'monospace',
@@ -1562,6 +1616,15 @@ const Dashboard = () => {
                                                                 {...hoverBorderButtonProps(T.txt3, T.ok, '#163028', T.okBg)}>
                                                                 Safe
                                                             </button>
+                                                            {currentRole === 'Analyst' && (
+                                                                <button onClick={e => { e.stopPropagation(); e.preventDefault(); confirmMule(alert._id); }}
+                                                                    title="Confirm Mule"
+                                                                    style={{ padding:'5px 10px', fontSize:11, fontWeight:600, borderRadius:5,
+                                                                        background:T.critBg, border:`1px solid ${T.critBdr}`, color:T.crit, cursor:'pointer' }}
+                                                                    {...hoverBorderButtonProps(T.crit, '#fff', T.critBdr, T.critBg)}>
+                                                                    Confirm Mule
+                                                                </button>
+                                                            )}
                                                             <button onClick={e => { e.stopPropagation(); setSelectedAccount(alert); }}
                                                                 style={{ padding:'5px 12px', fontSize:11, fontWeight:600, borderRadius:5,
                                                                     background:T.accentBg, border:`1px solid ${T.accent}30`,

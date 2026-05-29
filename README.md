@@ -1,5 +1,30 @@
 # Project Nexus
 
+## One-Click Start
+
+You can start the entire Project Nexus stack and automatically open the dashboard in your browser using the provided startup scripts.
+
+- Windows (double-click or run from a terminal):
+
+  - `start.bat` — starts the containers with `docker compose up -d`, waits a few seconds, then opens `http://localhost` in your default browser.
+
+- macOS / Linux:
+
+  - `start.sh` — run `bash start.sh` (or `./start.sh` after `chmod +x start.sh`) to start the containers and open `http://localhost`.
+
+Notes:
+
+- These scripts assume Docker Desktop / Docker Engine is installed and the `docker` CLI is available on the PATH.
+- The frontend is mapped to host ports (for example `80` and `5173`) and will be reachable via `http://localhost` — adjust the URL in the scripts if your compose file uses a different host port.
+- On macOS / Linux you may need to make the script executable:
+
+```
+chmod +x start.sh
+```
+
+If you prefer the frontend to be accessible only inside Docker (not bound to the host), remove the `ports:` entries for the frontend in `docker-compose.yml` and use `expose:` instead.
+# Project Nexus
+
 Project Nexus is a production-oriented fraud detection and risk analytics platform. It ingests transaction telemetry, scores it with a Python ML pipeline, stores alerts and file metadata in MongoDB, and presents analysts with a React dashboard for review, resolution, and operational visibility.
 
 ## What It Does
