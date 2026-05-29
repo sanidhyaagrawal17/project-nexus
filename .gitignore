@@ -12,3 +12,5 @@ ml-pipeline/data/live_stream_*.csv
 ml-pipeline/data/*.csv
 ml-pipeline/data/**/*.csv
 ml-pipeline/data/hackathon_mule_data.csv
+testdata/
+tmp_alert.json
