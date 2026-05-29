@@ -5,7 +5,7 @@ const { spawn } = require('child_process');
 let retrainJob = null;
 let activeRetrainProcess = null;
 
-function startRetrainScheduler() {
+function startRetrainScheduler(registerChildProcess = null) {
     if (retrainJob) {
         return retrainJob;
     }
@@ -22,6 +22,10 @@ function startRetrainScheduler() {
             stdio: ['ignore', 'pipe', 'pipe'],
             windowsHide: true,
         });
+
+        if (typeof registerChildProcess === 'function') {
+            registerChildProcess(activeRetrainProcess);
+        }
 
         activeRetrainProcess.stdout.on('data', (data) => {
             process.stdout.write(`[retrain stdout] ${data.toString()}`);

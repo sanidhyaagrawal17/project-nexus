@@ -17,6 +17,11 @@ from xgboost import DMatrix
 
 from feature_utils import align_features, clean_column_names, prepare_dataframe, save_json, to_numeric_frame
 
+try:
+    import psutil
+except ImportError:  # pragma: no cover - optional dependency fallback
+    psutil = None
+
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -130,6 +135,22 @@ def _resolve_input_path(csv_path: str) -> Path:
 
 def _load_dataframe(input_csv: Path):
     try:
+        preview_iter = pd.read_csv(input_csv, low_memory=False, chunksize=50000)
+        first_chunk = next(preview_iter)
+        row_count = len(first_chunk)
+        column_count = len(first_chunk.columns)
+        for chunk in preview_iter:
+            row_count += len(chunk)
+
+        estimated_bytes = float(row_count * max(column_count, 1) * 8)
+        if psutil is not None:
+            available_bytes = float(psutil.virtual_memory().available)
+            if estimated_bytes > available_bytes * 0.8:
+                raise MemoryError(
+                    f'Estimated CSV size ({estimated_bytes / (1024 ** 3):.2f} GB) exceeds 80% of available RAM '
+                    f'({available_bytes / (1024 ** 3):.2f} GB). Split the dataset before scoring.'
+                )
+
         return pd.read_csv(input_csv, low_memory=False)
     except Exception as exc:
         raise RuntimeError(f'Failed to read live data: {exc}') from exc

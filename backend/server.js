@@ -39,6 +39,8 @@ const io = new Server(server, {
 });
 app.set('trust proxy', 1);
 
+const activeChildProcesses = new Set();
+
 const MAX_JSON_BODY_SIZE = process.env.MAX_JSON_BODY_SIZE || '100mb';
 const MAX_URLENCODED_BODY_SIZE = process.env.MAX_URLENCODED_BODY_SIZE || '100mb';
 let maxUploadSizeMB = Number.parseInt(process.env.MAX_UPLOAD_SIZE_MB || '100', 10);
@@ -185,6 +187,60 @@ function emitEngineProgress(status) {
     } catch (e) { console.error('[!] emitEngineProgress failed', e); }
 }
 
+function registerActiveChildProcess(childProcess) {
+    if (!childProcess) {
+        return;
+    }
+
+    activeChildProcesses.add(childProcess);
+
+    const cleanup = () => {
+        activeChildProcesses.delete(childProcess);
+    };
+
+    childProcess.once('close', cleanup);
+    childProcess.once('error', cleanup);
+}
+
+async function stopActiveChildProcesses() {
+    const processes = Array.from(activeChildProcesses);
+    if (processes.length === 0) {
+        return;
+    }
+
+    console.log(` [!] Stopping ${processes.length} active child process(es)...`);
+    for (const childProcess of processes) {
+        try {
+            if (!childProcess.killed) {
+                childProcess.kill('SIGTERM');
+                setTimeout(() => {
+                    try {
+                        if (!childProcess.killed) {
+                            childProcess.kill('SIGKILL');
+                        }
+                    } catch (error) {
+                        console.error('[!] Failed to SIGKILL child process:', error);
+                    }
+                }, 5000).unref?.();
+            }
+        } catch (error) {
+            console.error('[!] Failed to stop child process:', error);
+        }
+    }
+}
+
+process.on('unhandledRejection', (reason) => {
+    const message = reason instanceof Error ? reason.message : String(reason);
+    console.error('[!] Unhandled promise rejection:', reason);
+    currentEngineStatus = 'Engine Failure';
+    emitEngineProgress(currentEngineStatus);
+    try {
+        io.emit('ENGINE_ERROR', { message });
+    } catch (emitError) {
+        console.error('[!] Failed to emit ENGINE_ERROR:', emitError);
+    }
+});
+
 async function shutdown(signal) {
     if (shuttingDown) {
         return;
@@ -192,6 +248,7 @@ async function shutdown(signal) {
 
     shuttingDown = true;
     console.log(` [!] Received ${signal}; shutting down gracefully...`);
+    await stopActiveChildProcesses();
     stopRetrainScheduler();
 
     try {
@@ -350,7 +407,13 @@ async function raiseModelGuardrailAlert({ sourceFileName, guardrail, scannedCoun
 function readJsonFileSafe(filePath) {
     try {
         if (fs.existsSync(filePath)) {
-            return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            const raw = fs.readFileSync(filePath, 'utf-8');
+            try {
+                return JSON.parse(raw);
+            } catch (parseError) {
+                console.error(`[!] Failed to parse JSON from ${filePath}:`, parseError.message);
+                return null;
+            }
         }
     } catch (err) {
         console.error(`[!] Failed to read ${filePath}:`, err.message);
@@ -451,15 +514,21 @@ async function persistInferenceResults(fileHash, originalFileName, predictionPay
     }));
 
     if (hydratedAlerts.length > 0) {
-        // Upsert alerts keyed by accountId + sourceFileName to avoid duplicates
-        const ops = hydratedAlerts.map(a => ({
-            updateOne: {
-                filter: { accountId: a.accountId, sourceFileName: a.sourceFileName },
-                update: { $set: a },
-                upsert: true,
-            }
-        }));
-        await Alert.bulkWrite(ops, { ordered: false });
+        const batchSize = 5000;
+        const totalBatches = Math.ceil(hydratedAlerts.length / batchSize);
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+            const chunk = hydratedAlerts.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+            const ops = chunk.map(alert => ({
+                updateOne: {
+                    filter: { accountId: alert.accountId, sourceFileName: alert.sourceFileName },
+                    update: { $set: alert },
+                    upsert: true,
+                }
+            }));
+            currentEngineStatus = `Committing batch ${batchIndex + 1} of ${totalBatches}...`;
+            emitEngineProgress(currentEngineStatus);
+            await Alert.bulkWrite(ops, { ordered: false });
+        }
     }
 
     const criticalCount = hydratedAlerts.filter(a => a.status === 'Critical').length;
@@ -519,15 +588,21 @@ async function persistLiveBatchResults(batchHash, batchLabel, predictionPayload)
     }));
 
     if (hydratedAlerts.length > 0) {
-        // Upsert alerts keyed by accountId + sourceFileName to avoid duplicates
-        const ops = hydratedAlerts.map(a => ({
-            updateOne: {
-                filter: { accountId: a.accountId, sourceFileName: a.sourceFileName },
-                update: { $set: a },
-                upsert: true,
-            }
-        }));
-        await Alert.bulkWrite(ops, { ordered: false });
+        const batchSize = 5000;
+        const totalBatches = Math.ceil(hydratedAlerts.length / batchSize);
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+            const chunk = hydratedAlerts.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+            const ops = chunk.map(alert => ({
+                updateOne: {
+                    filter: { accountId: alert.accountId, sourceFileName: alert.sourceFileName },
+                    update: { $set: alert },
+                    upsert: true,
+                }
+            }));
+            currentEngineStatus = `Committing batch ${batchIndex + 1} of ${totalBatches}...`;
+            emitEngineProgress(currentEngineStatus);
+            await Alert.bulkWrite(ops, { ordered: false });
+        }
     }
 
     const criticalCount = hydratedAlerts.filter(a => a.status === 'Critical').length;
@@ -675,7 +750,9 @@ app.delete('/api/system-wipe', createSimpleRateLimit({ windowMs: 15 * 60 * 1000,
             const files = fs.readdirSync(dataDir);
             for (const file of files) {
                 if (file.startsWith('live_stream_') && file.endsWith('.csv')) {
-                    fs.unlinkSync(path.join(dataDir, file));
+                    await fs.promises.unlink(path.join(dataDir, file)).catch(error => {
+                        console.warn('[!] Could not delete live stream file:', error.message);
+                    });
                 }
             }
         }
@@ -708,6 +785,10 @@ app.post('/api/upload', uploadRateLimiter, async (req, res) => {
     // Use a per-request multer instance so runtime-configurable limits apply
     const mw = getMulterMiddleware(overrideMB).single('telemetryFile');
     mw(req, res, async (err) => {
+        let targetCsvPath = null;
+        let fullPath = null;
+        let originalFileName = null;
+
         if (err) {
             if (err instanceof multer.MulterError) {
                 if (err.code === 'LIMIT_FILE_SIZE' || (err.message && err.message.toLowerCase().includes('file too large'))) {
@@ -721,9 +802,9 @@ app.post('/api/upload', uploadRateLimiter, async (req, res) => {
 
         if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
 
-        const targetCsvPath = path.join('data', req.file.filename);
-        const fullPath = path.join(__dirname, '../ml-pipeline/data', req.file.filename);
-        const originalFileName = req.file.originalname;
+            targetCsvPath = path.join('data', req.file.filename);
+            fullPath = path.join(__dirname, '../ml-pipeline/data', req.file.filename);
+            originalFileName = req.file.originalname;
 
         currentEngineStatus = 'Hashing file for deduplication check...';
         emitEngineProgress(currentEngineStatus);
@@ -734,7 +815,9 @@ app.post('/api/upload', uploadRateLimiter, async (req, res) => {
 
             const existingFile = await ProcessedFile.findOne({ fileHash: fileHash });
             if (existingFile) {
-                await fs.promises.unlink(fullPath);
+                    await fs.promises.unlink(fullPath).catch(error => {
+                        console.warn('[!] Could not delete duplicate file:', error.message);
+                    });
                 currentEngineStatus = 'Duplicate Rejected';
                 emitEngineProgress(currentEngineStatus);
                 await createLog('SYSTEM', 'REJECTION', `Data Replay Blocked: Uploaded dataset hash [${fileHash.substring(0, 8)}...] already exists in system.`);
@@ -776,8 +859,17 @@ app.post('/api/upload', uploadRateLimiter, async (req, res) => {
                 }
             })();
         } catch (hashErr) {
-            console.error('[!] File hashing or persistence error:', hashErr);
-            return res.status(500).json({ success: false, message: 'Failed to process uploaded file.' });
+                console.error('[!] File hashing or persistence error:', hashErr);
+                currentEngineStatus = 'Engine Failure';
+                emitEngineProgress(currentEngineStatus);
+                if (typeof fullPath === 'string') {
+                    await fs.promises.unlink(fullPath).catch(unlinkError => {
+                        console.warn('[!] Could not delete failed upload file:', unlinkError.message);
+                    });
+                }
+                if (!res.headersSent) {
+                    return res.status(500).json({ success: false, message: 'Failed to process uploaded file.' });
+                }
         }
     });
 });
@@ -800,7 +892,7 @@ async function bootstrap() {
             }
         } catch (err) { console.error('[!] Failed to load uploadConfig from DB:', err && err.message ? err.message : err); }
 
-        startRetrainScheduler();
+        startRetrainScheduler(registerActiveChildProcess);
         liveStreamProcessor.start();
         server.listen(PORT, () => console.log(` [+] Nexus Backend & WebSocket listening on port ${PORT}`));
     } catch (err) {

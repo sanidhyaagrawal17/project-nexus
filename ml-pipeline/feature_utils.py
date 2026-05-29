@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -278,5 +279,22 @@ def save_json(path, payload):
     """Write JSON payloads atomically enough for local pipeline outputs."""
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def sanitize(value):
+        if isinstance(value, dict):
+            return {key: sanitize(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [sanitize(item) for item in value]
+        if isinstance(value, tuple):
+            return [sanitize(item) for item in value]
+        if isinstance(value, (float, np.floating)):
+            if math.isnan(float(value)) or math.isinf(float(value)):
+                return None
+            return float(value)
+        if isinstance(value, (np.integer,)):
+            return int(value)
+        return value
+
+    sanitized_payload = sanitize(payload)
     with output_path.open('w', encoding='utf-8') as handle:
-        json.dump(payload, handle, indent=4)
+        json.dump(sanitized_payload, handle, indent=4, allow_nan=False)
