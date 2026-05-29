@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
+import MuleStatusBadge from '../components/MuleStatusBadge.jsx';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 
@@ -273,20 +274,7 @@ const ActorBadge = ({ actor }) => {
     );
 };
 
-const MuleStatusBadge = ({ status }) => {
-    const s = String(status || 'Pending');
-    const map = {
-        Pending: { color: T.txt2, bg: T.bg, border: T.border },
-        'Confirmed Mule': { color: T.crit, bg: T.critBg, border: T.critBdr },
-        'Not a Mule': { color: T.ok, bg: T.okBg, border: '#163028' },
-    };
-    const style = map[s] || map['Pending'];
-    return (
-        <span style={{ fontSize:11, fontWeight:800, letterSpacing:'0.06em', textTransform:'uppercase',
-            color: style.color, background: style.bg, border:`1px solid ${style.border}`,
-            padding:'6px 10px', borderRadius:8, minWidth:90, display:'inline-block', textAlign:'center' }}>{s}</span>
-    );
-};
+// MuleStatusBadge moved to src/components/MuleStatusBadge.jsx
 
 const BarTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
