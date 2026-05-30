@@ -116,16 +116,6 @@ const fmtThreshold = (v) => {
     return `${num.toFixed(0)}%`;
 };
 
-// Bug 1 fix: formatMetricDisplay was called on lines 1002-1003 but never defined,
-// causing a ReferenceError that crashed the entire Analytics view.
-const formatMetricDisplay = (value, sampleCount) => {
-    if (value === null || value === undefined) return '—';
-    const num = Number(value);
-    if (Number.isNaN(num)) return '—';
-    if (sampleCount !== undefined && sampleCount !== null && Number(sampleCount) < 20) return 'N/A';
-    return num.toFixed(3);
-};
-
 const RiskGauge = ({ score, status }) => {
     const r = 48, circ = 2 * Math.PI * r, arc = circ * 0.75, filled = arc * (score / 100);
     const isCrit = status === 'Critical';
@@ -718,6 +708,15 @@ const Dashboard = () => {
         .sort((a, b) => b.count - a.count).slice(0, 6), [featureCounts]);
 
     const inputSchemaLabel = inputSchema?.type === 'transaction_graph' ? 'Transaction Graph' : inputSchema?.type === 'wide_table' ? 'Wide Table' : (inputSchema?.type || 'Legacy Table');
+
+    const formatMetricDisplay = (value, sampleCount) => {
+        if (value === null || value === undefined) return 'n/a';
+        const num = Number(value);
+        if (Number.isNaN(num)) return 'n/a';
+        // If sample count is tiny, metrics like PR/ROC can be artificially perfect — hide them
+        if (sampleCount && sampleCount < 20) return 'n/a';
+        return num.toFixed(3);
+    };
 
     // ── Dynamic Sidebar Nav ──────────────────────────────────────────────────
     const getNavItems = () => {
