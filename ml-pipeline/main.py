@@ -11,7 +11,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+import time
 from pydantic import BaseModel, Field
 from xgboost import DMatrix
 
@@ -379,11 +380,38 @@ def healthz():
 
 
 @app.post('/predict')
-def predict(request: PredictRequest):
+async def predict(file: UploadFile | None = File(None), csv_path: str | None = Form(None), output_path: str | None = Form(None)):
+    """
+    Accept either a multipart `file` upload (preferred) or a `csv_path` string
+    (backwards-compatible). When `file` is provided the service will write it
+    into the `data/` directory for processing.
+    """
     try:
-        return predict_from_csv_path(request.csv_path, request.output_path)
+        if file is not None:
+            # save uploaded file to data dir with a short-lived unique name
+            target_dir = BASE_DIR / 'data'
+            target_dir.mkdir(parents=True, exist_ok=True)
+            temp_name = f"uploaded_{int(time.time() * 1000)}_{file.filename}"
+            temp_path = target_dir / temp_name
+            content = await file.read()
+            temp_path.write_bytes(content)
+            try:
+                payload = predict_from_csv_path(str(temp_path), output_path)
+            finally:
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
+            return payload
+
+        if csv_path is not None:
+            return predict_from_csv_path(csv_path, output_path)
+
+        raise HTTPException(status_code=400, detail='Either file or csv_path must be provided')
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

@@ -33,7 +33,7 @@ services:
       mongodb:
         condition: service_healthy
       ml-pipeline:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const req=http.get('http://localhost:5000/readyz',res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));"]
@@ -74,6 +74,12 @@ services:
       mongodb:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys;resp=urllib.request.urlopen('http://127.0.0.1:8000/healthz');sys.exit(0 if resp.getcode()==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
 volumes:
   nexus-mongo-data:

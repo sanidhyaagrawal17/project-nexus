@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema({
-    timestamp: { type: Date, default: Date.now },
+    timestamp: { type: Date, default: Date.now, expires: '30d' },
     actor: { type: String, required: true }, // 'SYSTEM', 'AI_ENGINE', or 'ANALYST'
     actionType: { type: String, required: true }, // 'UPLOAD', 'REJECTION', 'DETECTION', 'RESOLUTION'
     message: { type: String, required: true },

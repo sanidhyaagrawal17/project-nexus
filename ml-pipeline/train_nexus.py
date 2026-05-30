@@ -24,10 +24,6 @@ from feature_utils import (
     to_numeric_frame,
 )
 
-try:
-    from sklearn.calibration import FrozenEstimator
-except ImportError:
-    FrozenEstimator = None
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -48,6 +44,34 @@ def _resolve_data_path(argv):
 
 def _has_flag(argv, flag_name):
     return flag_name in argv
+
+
+def _select_curve_probabilities(*candidate_sets):
+    best_candidate = None
+    best_score = None
+
+    for candidate in candidate_sets:
+        if candidate is None:
+            continue
+
+        values = np.asarray(candidate, dtype=float)
+        values = values[np.isfinite(values)]
+        if values.size == 0:
+            continue
+
+        score = (
+            int(len(np.unique(np.round(values, 6)))),
+            float(np.std(values)),
+            float(np.ptp(values)),
+        )
+        if best_score is None or score > best_score:
+            best_score = score
+            best_candidate = values
+
+    if best_candidate is None:
+        return np.asarray([], dtype=float)
+
+    return best_candidate
 
 
 def _load_feedback_labels():
@@ -354,24 +378,34 @@ def run_nexus_pipeline():
         print(f'[!] Calibration skipped: {exc}')
 
     try:
-        if FrozenEstimator is not None:
-            standby_calibration_model = CalibratedClassifierCV(estimator=FrozenEstimator(standby_xgb_model), method='isotonic', cv=3)
-        else:
-            standby_calibration_model = CalibratedClassifierCV(estimator=standby_xgb_model, method='isotonic', cv=3)
-        standby_calibration_model.fit(X_calib_enhanced, y_calib)
-        standby_calibrated_model = standby_calibration_model
-        standby_calibration_available = True
+        calibration_model = CalibratedClassifierCV(estimator=xgb_model, method='isotonic', cv='prefit')
+        calibration_model.fit(X_calib_enhanced, y_calib)
+        calibrated_model = calibration_model
+        calibration_available = True
+    except Exception as exc:
+        print(f'[!] Calibration skipped: {exc}')
     except Exception as exc:
         print(f'[!] Standby calibration skipped: {exc}')
 
     # Fix: keep calibrated probabilities untouched so threshold tuning and metrics remain valid.
     validation_probabilities = calibrated_model.predict_proba(X_calib_enhanced)[:, 1]
     standby_validation_probabilities = standby_calibrated_model.predict_proba(X_calib_enhanced)[:, 1]
+    raw_validation_probabilities = xgb_model.predict_proba(X_calib_enhanced)[:, 1]
+    raw_standby_validation_probabilities = standby_xgb_model.predict_proba(X_calib_enhanced)[:, 1]
+
+    curve_validation_probabilities = _select_curve_probabilities(
+        validation_probabilities,
+        raw_validation_probabilities,
+    )
+    curve_standby_probabilities = _select_curve_probabilities(
+        standby_validation_probabilities,
+        raw_standby_validation_probabilities,
+    )
 
     threshold_settings = optimize_threshold(y_calib, validation_probabilities)
     standby_threshold_settings = optimize_threshold(y_calib, standby_validation_probabilities)
-    threshold_curve = build_threshold_curve(y_calib, validation_probabilities)
-    standby_threshold_curve = build_threshold_curve(y_calib, standby_validation_probabilities)
+    threshold_curve = build_threshold_curve(y_calib, curve_validation_probabilities)
+    standby_threshold_curve = build_threshold_curve(y_calib, curve_standby_probabilities)
 
     test_probabilities = calibrated_model.predict_proba(X_test_enhanced)[:, 1]
     standby_test_probabilities = standby_calibrated_model.predict_proba(X_test_enhanced)[:, 1]

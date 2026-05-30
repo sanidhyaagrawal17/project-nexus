@@ -29,6 +29,7 @@ const alertSchema = new mongoose.Schema({
     },
     
     status: { type: String, required: true },
+    muleStatus: { type: String, enum: ['Pending', 'Confirmed Mule', 'Not a Mule'], default: 'Pending' },
     detectedAt: { type: Date, default: Date.now } 
 });
 
