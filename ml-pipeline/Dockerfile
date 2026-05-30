@@ -10,10 +10,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Two-step copy: copy only requirements first to leverage Docker layer caching
 COPY requirements.txt ./
 RUN python -m venv "$VIRTUAL_ENV" \
     && pip install --no-cache-dir -r requirements.txt
 
+# Then copy the rest of the source
 COPY . .
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
