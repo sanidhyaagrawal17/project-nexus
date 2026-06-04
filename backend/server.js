@@ -1,3 +1,4 @@
+const uploadController = require('./controllers/upload.controller');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -996,12 +997,42 @@ app.post('/api/resolve', createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRe
 });
 
 app.post('/api/upload', uploadRateLimiter, async (req, res) => {
-    // Determine per-upload override from query param (e.g., ?max_upload_mb=50)
+    // 1. Dynamic File Size Logic (Preserved for Admin UI controls)
     const overrideRaw = req.query?.max_upload_mb || req.get('x-max-upload-mb');
     const overrideMB = overrideRaw ? Number.parseInt(String(overrideRaw), 10) : undefined;
 
     console.log(`[+] Upload request received: overrideRaw=${overrideRaw || 'none'}, overrideMB=${Number.isNaN(overrideMB) ? 'NaN' : (overrideMB ?? 'none')}, globalMaxMB=${maxUploadSizeMB}, enabled=${uploadLimitEnabled}, hardCapMB=${HARD_UPLOAD_CAP_MB}`);
 
+    // Calculate the final allowed size in Bytes
+    let finalLimitMB = HARD_UPLOAD_CAP_MB; 
+    if (uploadLimitEnabled) {
+        finalLimitMB = (overrideMB && !Number.isNaN(overrideMB)) ? overrideMB : maxUploadSizeMB;
+        if (finalLimitMB > HARD_UPLOAD_CAP_MB) finalLimitMB = HARD_UPLOAD_CAP_MB;
+    }
+    
+    // 2. Parse the file using Multer with the dynamic limit applied
+    const dynamicUpload = multer({ 
+        dest: 'uploads/', // Or wherever your temp upload directory is defined
+        limits: { fileSize: finalLimitMB * 1024 * 1024 } 
+    }).single('telemetryFile');
+
+    dynamicUpload(req, res, async (err) => {
+        if (err) {
+            console.error("[-] Upload rejected by Multer:", err.message);
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+        }
+
+        // 3. The Optimization Handoff
+        // We attach the Socket.io instance to the request so the controller can 
+        // broadcast real-time progress bars to the React frontend.
+        req.io = io; 
+        
+        // Delegate to the lightning-fast Python/Bulk-Insert Controller
+        uploadController.processUpload(req, res);
+    });
     // Use a per-request multer instance so runtime-configurable limits apply
     const mw = getMulterMiddleware(overrideMB).single('telemetryFile');
     mw(req, res, async (err) => {
@@ -1269,5 +1300,23 @@ app.post('/api/retrain', requireAdmin, async (req, res) => {
     } catch (err) {
         console.error('[!] Failed to start retrain:', err && err.message ? err.message : err);
         return res.status(500).json({ success: false, message: 'Failed to start retrain' });
+    }
+});
+
+// Aggregate alert stats (critical / highRisk). Optional `dataset` query param filters by sourceFileName.
+app.get('/api/alerts/stats', async (req, res) => {
+    try {
+        const q = {};
+        const dataset = req.query.dataset;
+        if (dataset && dataset !== 'ALL') q.sourceFileName = dataset;
+
+        const [critical, highRisk] = await Promise.all([
+            Alert.countDocuments({ ...q, status: 'Critical' }),
+            Alert.countDocuments({ ...q, status: 'High Risk' }),
+        ]);
+
+        res.json({ success: true, critical: Number(critical || 0), highRisk: Number(highRisk || 0) });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });

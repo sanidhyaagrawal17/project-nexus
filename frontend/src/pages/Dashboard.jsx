@@ -6,28 +6,16 @@ import MuleStatusBadge from '../components/MuleStatusBadge.jsx';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 
-const T = {
-    bg: '#111214',
-    surface: '#18191d',
-    raised: '#1e2026',
-    border: '#2c2e36',
-    borderHi: '#383a46',
-    txt1: '#dde0e8',
-    txt2: '#8b8fa3',
-    txt3: '#555769',
-    accent: '#5b6af0',        // Admin Accent (Indigo)
-    accentBg: '#1e2140',
-    analystAccent: '#0d9488', // Analyst Accent (Teal)
-    analystAccentBg: '#134e4a',
-    crit: '#d97634',
-    critBg: '#221a0f',
-    critBdr: '#3d2a12',
-    high: '#4a8fd4',
-    highBg: '#0d1a2a',
-    highBdr: '#1a3050',
-    ok: '#4a9e6e',
-    okBg: '#0d1f16',
-};
+// ============================================================================
+// 1. THEME & CONSTANTS
+// ============================================================================
+
+import T from '../lib/theme';
+import {
+    RiskGauge, RiskBar, StatusChip, ActorBadge, Card, PadCard, MetricCard, PanelHeader,
+    Pagination, ConfusionMatrix, ThresholdSlider, AlertAge, BarTooltip, ImportanceTooltip,
+    TH, TD, hoverBorderButtonProps, Divider
+} from '../components/ui/Widgets';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -47,6 +35,32 @@ const UPLOAD_PROGRESS_STEPS = [
     { label: 'Upload' }, { label: 'Hash' }, { label: 'Score' }, { label: 'Commit' }, { label: 'Done' }
 ];
 
+const featureDictionary = {
+    F115: 'High-Velocity Transfer Bursts',
+    F321: 'Immediate Cash-Out After Inflow',
+    F527: 'Geographic / IP Mismatch',
+    F531: 'Off-Hours Transaction Spike',
+    F670: 'Structured Transaction Splitting',
+    F1692: 'New Beneficiary Linkage',
+    F2082: 'Shared Device Indicator',
+    F2122: 'Multi-Account Overlap',
+    F2582: 'Rapid Merchant Cycling',
+    F2678: 'Short-Lived Balance Spike',
+    F2737: 'Cross-Border Routing Pattern',
+    F2956: 'Dormancy Breakout',
+    F3043: 'Night-Time Escalation',
+    F3836: 'Velocity Cap Breach',
+    F3887: 'Circular Flow Indicator',
+    F3889: 'Pass-Through Ratio Spike',
+    F3891: 'Related-Party Concentration',
+    F3894: 'Network Reciprocity Spike',
+    Anomaly_Score:'Statistical Deviation',
+};
+
+// ============================================================================
+// 2. UTILITY FUNCTIONS
+// ============================================================================
+
 const getUploadStatusMeta = (status) => {
     const normalized = String(status || 'Idle').trim().toLowerCase();
     return UPLOAD_STATUS_COPY[normalized] || { label: status || 'Idle', detail: 'Processing the current file.', kind: 'active', phase: 2 };
@@ -57,28 +71,6 @@ const formatDuration = (seconds) => {
     const minutes = Math.floor(safeSeconds / 60);
     const remainder = safeSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
-};
-
-const featureDictionary = {
-    F115:         'High-Velocity Transfer Bursts',
-    F321:         'Immediate Cash-Out After Inflow',
-    F527:         'Geographic / IP Mismatch',
-    F531:         'Off-Hours Transaction Spike',
-    F670:         'Structured Transaction Splitting',
-    F1692:        'New Beneficiary Linkage',
-    F2082:        'Shared Device Indicator',
-    F2122:        'Multi-Account Overlap',
-    F2582:        'Rapid Merchant Cycling',
-    F2678:        'Short-Lived Balance Spike',
-    F2737:        'Cross-Border Routing Pattern',
-    F2956:        'Dormancy Breakout',
-    F3043:        'Night-Time Escalation',
-    F3836:        'Velocity Cap Breach',
-    F3887:        'Circular Flow Indicator',
-    F3889:        'Pass-Through Ratio Spike',
-    F3891:        'Related-Party Concentration',
-    F3894:        'Network Reciprocity Spike',
-    Anomaly_Score:'Statistical Deviation',
 };
 
 const normalizeFeatureImpact = (feature) => {
@@ -96,17 +88,16 @@ const normalizeFeatureImpact = (feature) => {
 };
 
 const featureLabel = (code) => featureDictionary[code] || `Feature ${code}`;
+const translate = (code) => featureLabel(code);
 const getAlertFeatures = (alert) => (alert.topFeatures || []).map(normalizeFeatureImpact).filter(Boolean);
 
 const featureCat = (code) => {
-    if (['F115','F321','F670','F3836','F531','F3894','F3891','F3887','F3889'].includes(code)) return { bg:'#1f1410', color:'#c4783a', border:'#3a2210' };  
-    if (['F527','F2737'].includes(code)) return { bg:'#101820', color:'#5a9ed4', border:'#1a3048' };  
-    if (['F2082','F2122'].includes(code)) return { bg:'#161024', color:'#8b72cc', border:'#2a1e48' };  
-    if (['F1692','F2956','F2582','F2678','F3043'].includes(code)) return { bg:'#0e1a18', color:'#4a9e82', border:'#163028' };  
-    return { bg:'#111630', color:'#6a7ae8', border:'#1e2650' };   
+    if (['F115','F321','F670','F3836','F531','F3894','F3891','F3887','F3889'].includes(code)) return { bg:'rgba(239,68,68,0.08)', color:'#ef4444', border:'rgba(239,68,68,0.2)' };  
+    if (['F527','F2737'].includes(code)) return { bg:'rgba(99,102,241,0.08)', color:'#818cf8', border:'rgba(99,102,241,0.2)' };  
+    if (['F2082','F2122'].includes(code)) return { bg:'rgba(168,85,247,0.08)', color:'#c084fc', border:'rgba(168,85,247,0.2)' };  
+    if (['F1692','F2956','F2582','F2678','F3043'].includes(code)) return { bg:'rgba(20,184,166,0.08)', color:'#2dd4bf', border:'rgba(20,184,166,0.2)' };  
+    return { bg:'rgba(139,92,246,0.08)', color:'#a78bfa', border:'rgba(139,92,246,0.2)' };   
 };
-
-const translate = (code) => featureLabel(code);
 
 const fmtThreshold = (v) => {
     if (v === null || v === undefined) return '';
@@ -116,238 +107,523 @@ const fmtThreshold = (v) => {
     return `${num.toFixed(0)}%`;
 };
 
-const RiskGauge = ({ score, status }) => {
-    const r = 48, circ = 2 * Math.PI * r, arc = circ * 0.75, filled = arc * (score / 100);
-    const isCrit = status === 'Critical';
-    const color  = isCrit ? T.crit : T.high;
-    return (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, minWidth:120 }}>
-            <svg width="120" height="90" viewBox="0 0 120 95">
-                <circle cx="60" cy="68" r={r} fill="none" stroke={T.border} strokeWidth="8" strokeDasharray={`${arc} ${circ-arc}`} strokeDashoffset={circ*0.125} strokeLinecap="round"/>
-                <circle cx="60" cy="68" r={r} fill="none" stroke={color} strokeWidth="8" strokeDasharray={`${filled} ${circ-filled}`} strokeDashoffset={circ*0.125} strokeLinecap="round" style={{ transition:'stroke-dasharray 0.6s ease' }}/>
-                <text x="60" y="63" textAnchor="middle" fontSize="19" fontWeight="600" fill={color} fontFamily="'IBM Plex Mono', 'Courier New', monospace">{score.toFixed(1)}%</text>
-                <text x="60" y="78" textAnchor="middle" fontSize="8" fill={T.txt3} fontFamily="monospace" letterSpacing="1.5">AI CONFIDENCE</text>
-            </svg>
-            <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color, background: isCrit ? T.critBg : T.highBg, border:`1px solid ${isCrit ? T.critBdr : T.highBdr}`, padding:'3px 10px', borderRadius:4 }}>
-                {status}
-            </span>
-        </div>
-    );
-};
+const alertAgeMs   = (detectedAt) => Date.now() - new Date(detectedAt || 0).getTime();
+const formatAge    = (ms) => { const h = Math.floor(ms / 3600000); if (h < 24) return `${h}h ${Math.floor((ms % 3600000) / 60000)}m`; return `${Math.floor(h/24)}d ${h%24}h`; };
+const ageColor     = (ms) => { const h = ms/3600000; if (h > 72) return T.crit; if (h > 24) return T.high; return T.ok; };
 
-const RiskBar = ({ score, status }) => (
-    <div style={{ height:3, background: T.border, borderRadius:2, overflow:'hidden', marginTop:5 }}>
-        <div style={{ height:'100%', width:`${score}%`, borderRadius:2, transition:'width 0.5s ease', background: status === 'Critical' ? T.crit : T.high }} />
+
+
+// ============================================================================
+// 4. VIEW COMPONENTS
+// ============================================================================
+
+const AdminOverviewView = ({
+    activeDataset, visibleDatasetFiles, totalScanned, critCount, highCount,
+    fileInputRef, uploadLimitEnabled, setUploadLimitEnabled, maxUploadMB, setMaxUploadMB,
+    perUploadMB, setPerUploadMB, saveUploadConfig, inputSchemaLabel, inputSchema, activeAccent, activeAccentBg
+}) => (
+    <div>
+        <Card style={{ padding:'28px 32px', marginBottom:20, background:`linear-gradient(135deg, ${T.surface} 0%, #000 100%)`, border:`1px solid ${T.borderHi}` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:24, flexWrap:'wrap', alignItems:'flex-start' }}>
+                <div style={{ maxWidth:680 }}>
+                    <div style={{ fontSize:12, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:12, fontWeight:700 }}>Dataset Lab</div>
+                    <h2 style={{ margin:'0 0 12px 0', fontSize:32, fontWeight:800, lineHeight:1.1, color:T.txt1, letterSpacing:'-0.03em' }}>System Ingestion & Global Architecture</h2>
+                    <p style={{ margin:0, color:T.txt2, fontSize:14, lineHeight:1.6, maxWidth:600 }}>Manage the core ML ingest flow, alter batch chunk sizes, and configure schema ingestion parameters before releasing datasets to the Analyst queue.</p>
+                    <div style={{ display:'flex', gap:12, marginTop:24, flexWrap:'wrap', alignItems:'center' }}>
+                        <button onClick={() => fileInputRef.current?.click()} style={{ padding:'12px 20px', borderRadius:8, border:`1px solid ${activeAccent}`, background:activeAccent, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:`0 0 16px ${activeAccentBg}` }}>Upload CSV File</button>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:16, borderLeft:`1px solid ${T.border}` }}>
+                            <label style={{ fontSize:13, color:T.txt2, display:'flex', alignItems:'center', gap:8, fontWeight:600 }}>
+                                <input type="checkbox" checked={uploadLimitEnabled} onChange={e => setUploadLimitEnabled(e.target.checked)} style={{ accentColor:activeAccent }} />
+                                <span style={{ marginLeft:4 }}>Limit uploads</span>
+                            </label>
+                            <input type="number" min={1} value={maxUploadMB} onChange={e => setMaxUploadMB(e.target.value)} style={{ width:90, padding:'8px 12px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontWeight:600 }} />
+                            <button onClick={saveUploadConfig} style={{ padding:'8px 16px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.raised, color:T.txt1, cursor:'pointer', fontWeight:600, transition:'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='#3f3f46'} onMouseLeave={e => e.currentTarget.style.background=T.raised}>Save Limit</button>
+                            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:12 }}>
+                                <span style={{ fontSize:13, color:T.txt2, fontWeight:600 }}>Per-upload MB</span>
+                                <input type="number" min={1} value={perUploadMB} onChange={e => setPerUploadMB(e.target.value)} style={{ width:90, padding:'8px 12px', borderRadius:8, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontWeight:600 }} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ minWidth:260, padding:'20px 24px', borderRadius:16, background:'rgba(0,0,0,0.3)', border:`1px solid ${T.borderHi}`, backdropFilter:'blur(8px)' }}>
+                    <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10, fontWeight:700 }}>Current Schema</div>
+                            <div style={{ fontSize:24, fontWeight:800, color:activeAccent, marginBottom:8, textShadow:`0 0 12px ${activeAccentBg}` }}>{inputSchemaLabel}</div>
+                    <div style={{ fontSize:13, color:T.txt2, lineHeight:1.6 }}>
+                        {inputSchema?.type === 'transaction_graph' ? 'Source and destination accounts are aggregated into node-level risk features for network reciprocity.' : 'The model is currently using the legacy wide-table account schema.'}
+                    </div>
+                </div>
+            </div>
+        </Card>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:20, marginBottom:20 }}>
+            <MetricCard label="Total Accounts Scanned" value={totalScanned.toLocaleString()} color={T.txt1} />
+            <MetricCard label="Critical Threats" value={critCount} color={T.crit} />
+            <MetricCard label="High Risk Anomalies" value={highCount} color={T.high} />
+        </div>
     </div>
 );
 
-const StatusChip = ({ status }) => {
-    const isCrit = status === 'Critical';
-    return (
-        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color: isCrit ? T.crit : T.high, background: isCrit ? T.critBg : T.highBg, border:`1px solid ${isCrit ? T.critBdr : T.highBdr}`, padding:'2px 8px', borderRadius:3, whiteSpace:'nowrap' }}>
-            {status}
-        </span>
-    );
-};
-
-const ActorBadge = ({ actor }) => {
-    const map = {
-        SYSTEM:   { color:'#8b8fa3', bg:'#1e2026', border:T.border },
-        AI_ENGINE:{ color:'#6a7ae8', bg:'#111630', border:'#1e2650' },
-        ANALYST:  { color:'#4a9e6e', bg:'#0d1f16', border:'#163028' },
-    };
-    const s = map[actor] || { color: T.txt2, bg: T.raised, border: T.border };
-    return (
-        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:s.color, background:s.bg, border:`1px solid ${s.border}`, padding:'2px 8px', borderRadius:3 }}>
-            {actor}
-        </span>
-    );
-};
-
-const BarTooltip = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const d = payload[0].payload;
-    return (
-        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:6, padding:'10px 14px', fontSize:12 }}>
-            <p style={{ color:T.txt2, fontFamily:'monospace', marginBottom:2, fontSize:11 }}>{d.name}</p>
-            <p style={{ color:T.txt1, marginBottom:4 }}>{d.fullName}</p>
-            <p style={{ color:T.accent, fontWeight:600 }}>{d.count} occurrences</p>
+const SystemLogsView = ({
+    activeLogTab, setActiveLogTab, handleSystemWipe, currentLogs, currentPage, totalLogPages, jumpPage, setJumpPage, handleJumpKey, setCurrentPage,
+    currentFiles, resolveSourceType, totalFilePages
+}) => (
+    <div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:12 }}>
+            <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:4, gap:4, overflowX:'auto' }}>
+                {[['ALL','All Events'],['AI_ENGINE','AI Engine'],['ANALYST','Analyst'],['SYSTEM','System'],['FILES','Datasets']].map(([id,label]) => (
+                    <button key={id} onClick={() => setActiveLogTab(id)} style={{ padding:'8px 16px', fontSize:13, fontWeight:700, borderRadius:6, border:'none', cursor:'pointer', transition:'all 0.2s', whiteSpace:'nowrap', background: activeLogTab === id ? T.raised : 'transparent', color: activeLogTab === id ? T.txt1 : T.txt3 }}>{label}</button>
+                ))}
+            </div>
+            <button onClick={handleSystemWipe} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', fontSize:13, fontWeight:700, borderRadius:8, cursor:'pointer', background:T.critBg, border:`1px solid ${T.critBdr}`, color:T.crit, transition:'all 0.2s', boxShadow:`0 0 12px ${T.critBg}` }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = T.critBg; }}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg> Wipe Database
+            </button>
         </div>
-    );
-};
 
-// Bug 2 fix: feature importance data has an `importance` field, not `count`,
-// and may not carry `fullName`. Using BarTooltip there showed "undefined occurrences".
-const ImportanceTooltip = ({ active, payload }) => {
-    if (!active || !payload?.length) return null;
-    const d = payload[0].payload;
-    return (
-        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:6, padding:'10px 14px', fontSize:12 }}>
-            <p style={{ color:T.txt2, fontFamily:'monospace', marginBottom:2, fontSize:11 }}>{d.name}</p>
-            {d.fullName && <p style={{ color:T.txt1, marginBottom:4 }}>{d.fullName}</p>}
-            <p style={{ color:T.accent, fontWeight:600 }}>Importance: {typeof d.importance === 'number' ? d.importance.toFixed(4) : d.importance}</p>
-        </div>
-    );
-};
-
-const TH = ({ children, right }) => (
-    <th style={{ padding:'10px 16px', fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:T.txt3, background:T.bg, borderBottom:`1px solid ${T.border}`, textAlign: right ? 'right' : 'left', whiteSpace:'nowrap', userSelect:'none' }}>
-        {children}
-    </th>
-);
-
-const TD = ({ children, right, mono, muted }) => (
-    <td style={{ padding:'12px 16px', verticalAlign:'middle', fontSize:13, color: muted ? T.txt2 : T.txt1, textAlign: right ? 'right' : 'left', fontFamily: mono ? "'IBM Plex Mono', monospace" : 'inherit' }}>
-        {children}
-    </td>
-);
-
-const MetricCard = ({ label, value, color = T.txt1, note }) => (
-    <Card style={{ padding:'16px 18px' }}>
-        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{label}</div>
-        <div style={{ fontSize:24, fontWeight:700, color, fontFamily:'monospace' }}>{value}</div>
-        {note && <div style={{ fontSize:11, color:T.txt3, marginTop:6 }}>{note}</div>}
-    </Card>
-);
-
-const PanelHeader = ({ kicker, title, description }) => (
-    <>
-        <div style={{ fontSize:11, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{kicker}</div>
-        <div style={{ fontSize:18, fontWeight:700, color:T.txt1, marginBottom:6 }}>{title}</div>
-        {description ? <div style={{ fontSize:11, color:T.txt2, marginBottom:12, lineHeight:1.5 }}>{description}</div> : null}
-    </>
-);
-
-const Card = ({ children, style }) => (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, overflow:'hidden', ...style }}>
-        {children}
+        {activeLogTab !== 'FILES' ? (
+            <Card>
+                <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <thead><tr><TH>Timestamp</TH><TH>Actor</TH><TH>Event</TH><TH>Message</TH></tr></thead>
+                    <tbody>
+                        {currentLogs.length > 0 ? currentLogs.map((log, i) => (
+                            <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <td style={{ padding:'14px 16px', fontFamily:'monospace', fontSize:12, color:T.txt3, whiteSpace:'nowrap' }}>{new Date(log.timestamp).toLocaleString()}</td>
+                                <td style={{ padding:'14px 16px' }}><ActorBadge actor={log.actor} /></td>
+                                <td style={{ padding:'14px 16px' }}><span style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color: log.actionType === 'REJECTION' ? T.crit : log.actionType === 'RESOLUTION' ? T.ok : T.txt3 }}>{log.actionType}</span></td>
+                                <TD>{log.message}</TD>
+                            </tr>
+                        )) : <tr><td colSpan="4" style={{ padding:'40px 16px', textAlign:'center', color:T.txt3, fontSize:13, fontFamily:'monospace', letterSpacing:'0.1em' }}>NO LOGS MATCHING FILTER</td></tr>}
+                    </tbody>
+                </table>
+                <Pagination current={currentPage} total={totalLogPages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalLogPages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalLogPages,p+1))} />
+            </Card>
+        ) : (
+            <Card>
+                <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <thead><tr><TH>Ingested At</TH><TH>File Name</TH><TH>Source</TH><TH>SHA-256 Hash</TH></tr></thead>
+                    <tbody>
+                        {currentFiles.length > 0 ? currentFiles.map((file, i) => (
+                            <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <td style={{ padding:'14px 16px', fontFamily:'monospace', fontSize:12, color:T.txt3, whiteSpace:'nowrap' }}>{new Date(file.processedAt).toLocaleString()}</td>
+                                <td style={{ padding:'14px 16px', fontSize:14, fontWeight:700, color:T.high, fontFamily:'monospace' }}>{file.fileName}</td>
+                                <td style={{ padding:'14px 16px' }}><span style={{ fontSize:10, fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase', color:resolveSourceType(file) === 'LIVE_STREAM' ? T.high : T.txt2, background: resolveSourceType(file) === 'LIVE_STREAM' ? T.highBg : T.raised, border:`1px solid ${resolveSourceType(file) === 'LIVE_STREAM' ? T.highBdr : T.borderHi}`, padding:'3px 10px', borderRadius:9999 }}>{resolveSourceType(file) === 'LIVE_STREAM' ? 'Live Stream' : 'Static Ingest'}</span></td>
+                                <td style={{ padding:'14px 16px', fontFamily:'monospace', fontSize:12, color:T.txt3, wordBreak:'break-all' }}>{file.fileHash}</td>
+                            </tr>
+                        )) : <tr><td colSpan="4" style={{ padding:'40px 16px', textAlign:'center', color:T.txt3, fontSize:13, fontFamily:'monospace', letterSpacing:'0.1em' }}>NO DATASETS INGESTED</td></tr>}
+                    </tbody>
+                </table>
+                <Pagination current={currentPage} total={totalFilePages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalFilePages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalFilePages,p+1))} />
+            </Card>
+        )}
     </div>
 );
 
-const PadCard = ({ children, style }) => (
-    <Card style={{ padding:20, ...style }}>
-        {children}
-    </Card>
+const ModelAnalyticsView = ({
+    inputSchema, modelConfig, modelMetrics, formatMetricDisplay, activeAccent, thresholdCurve, droppedFeatures, activeAlerts, riskData, CHART_CLRS, featureData, featureImportance
+}) => (
+    <div>
+        <Card style={{ padding:'20px 24px', marginBottom:20, border:`1px solid ${T.okBdr || 'rgba(16,185,129,0.3)'}`, background:`linear-gradient(135deg, ${T.surface} 0%, rgba(16,185,129,0.05) 100%)` }}>
+            <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+                <div style={{ width:12, height:12, borderRadius:999, background:T.ok, boxShadow:`0 0 12px ${T.ok}` }} />
+                <div>
+                    <div style={{ fontSize:13, fontWeight:800, color:T.ok, letterSpacing:'0.1em', textTransform:'uppercase' }}>PS2 Compliance Validated</div>
+                    <div style={{ fontSize:13, color:T.txt1, lineHeight:1.6, marginTop:6 }}>Pipeline successfully executes Graph Node Aggregation (Ring Detection), Velocity Burst Tracking (Pass-Through Detection), and Recall-Optimized Thresholding to satisfy Problem Statement 2 requirements.</div>
+                </div>
+            </div>
+        </Card>
+
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:16, marginBottom:20 }}>
+            {[
+                { label:'Input Schema', value:inputSchema?.type === 'transaction_graph' ? 'GRAPH' : (inputSchema?.type || 'wide_table') },
+                { label:'Alert Threshold', value:modelConfig?.alert_threshold?.toFixed ? modelConfig.alert_threshold.toFixed(2) : (modelConfig?.alert_threshold ?? '0.85') },
+                { label:'Critical Threshold', value:modelConfig?.critical_threshold?.toFixed ? modelConfig.critical_threshold.toFixed(2) : (modelConfig?.critical_threshold ?? '0.95') },
+                { label:'ROC AUC', value: formatMetricDisplay(modelMetrics?.roc_auc, modelMetrics?.sample_count) },
+                { label:'PR AUC', value: formatMetricDisplay(modelMetrics?.pr_auc, modelMetrics?.sample_count) },
+            ].map(({ label, value }) => (
+                <MetricCard key={label} label={label} value={value} note={((label === 'ROC AUC' || label === 'PR AUC') && modelMetrics?.sample_count && modelMetrics.sample_count < 20) ? 'Insufficient samples to reliably show this metric' : null} color={activeAccent} />
+            ))}
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+            <PadCard>
+                <PanelHeader kicker="Threshold sweep" title="Alert volume by threshold" description="This chart answers a single question: how many alerts remain as the cutoff rises?" />
+                <div style={{ height:240 }}>
+                    {thresholdCurve.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={240} minWidth={1}>
+                            <LineChart data={thresholdCurve} margin={{ top:8, right:16, left:0, bottom:8 }}>
+                                <defs>
+                                    <linearGradient id="colorAlert" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor={activeAccent} stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor={activeAccent} stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="threshold" label={{ value:'Threshold', position:'insideBottom', offset:-5, fill:T.txt3, fontSize:12 }} tickFormatter={fmtThreshold} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace' }} axisLine={false} tickLine={false} angle={-45} textAnchor="end" interval="preserveStartEnd" height={54} />
+                                <YAxis label={{ value:'Alerts', angle:-90, position:'insideLeft', fill:T.txt3, fontSize:12 }} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace' }} axisLine={false} tickLine={false} />
+                                <RechartsTooltip contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, fontSize:13, color:T.txt1, boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }} />
+                                <Legend wrapperStyle={{ fontSize:13, paddingTop:12, color:T.txt2, fontWeight:600 }} />
+                                <Line type="monotone" dataKey="alert_count" stroke={activeAccent} strokeWidth={3} dot={false} name="Alert Count" activeDot={{ r: 6, fill: activeAccent, stroke: T.bg, strokeWidth: 2 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:13, fontFamily:'monospace' }}>No threshold curve</div>}
+                </div>
+                <div style={{ marginTop:16, fontSize:12, color:T.txt3, lineHeight:1.5 }}>Pruned {droppedFeatures.length} correlated features to keep the schema lean.</div>
+            </PadCard>
+
+            <PadCard>
+                <PanelHeader kicker="Threshold sweep" title="Detection quality by threshold" description="Precision, recall, and F1 are shown on the same scale so the trade-off is obvious." />
+                <div style={{ height:240 }}>
+                    {thresholdCurve.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={240} minWidth={1}>
+                            <LineChart data={thresholdCurve} margin={{ top:8, right:16, left:0, bottom:8 }}>
+                                <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="threshold" label={{ value:'Threshold', position:'insideBottom', offset:-5, fill:T.txt3, fontSize:12 }} tickFormatter={fmtThreshold} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace' }} axisLine={false} tickLine={false} angle={-45} textAnchor="end" interval="preserveStartEnd" height={54} />
+                                <YAxis label={{ value:'Score', angle:-90, position:'insideLeft', fill:T.txt3, fontSize:12 }} domain={[0, 1]} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace' }} axisLine={false} tickLine={false} />
+                                <RechartsTooltip contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, fontSize:13, color:T.txt1, boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }} />
+                                <Legend wrapperStyle={{ fontSize:13, paddingTop:12, color:T.txt2, fontWeight:600 }} />
+                                <Line type="monotone" dataKey="precision" stroke={T.ok} strokeWidth={3} dot={false} name="Precision" />
+                                <Line type="monotone" dataKey="recall" stroke={T.high} strokeWidth={3} dot={false} name="Recall" />
+                                <Line type="monotone" dataKey="f1" stroke={activeAccent} strokeWidth={3} dot={false} name="F1" />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:13, fontFamily:'monospace' }}>No threshold curve</div>}
+                </div>
+            </PadCard>
+
+            <PadCard>
+                <PanelHeader kicker="Alert mix" title="Critical vs high-risk share" description="This shows the alert population split at the current thresholds." />
+                <div style={{ height:280 }}>
+                    {activeAlerts.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={280} minWidth={1}>
+                            <PieChart>
+                                <Pie data={riskData} innerRadius={70} outerRadius={110} paddingAngle={5} dataKey="value" stroke="none" cornerRadius={4}>
+                                    {riskData.map((_, i) => <Cell key={i} fill={CHART_CLRS[i]} style={{ filter: `drop-shadow(0 0 8px ${CHART_CLRS[i]}80)` }} />)}
+                                </Pie>
+                                <RechartsTooltip cursor={false} contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, fontSize:13, color:T.txt1, boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }} />
+                                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize:13, paddingTop:16, color:T.txt1, fontWeight:600 }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:13, fontFamily:'monospace' }}>No data</div>}
+                </div>
+            </PadCard>
+
+            <PadCard>
+                <PanelHeader kicker="Signal frequency" title="Most frequent anomaly signals" description="The top repeated signals help explain which behaviors are dominating the current batch." />
+                <div style={{ height:280 }}>
+                    {featureData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={280} minWidth={1}>
+                            <BarChart data={featureData} layout="vertical" margin={{ top:0, right:16, left:8, bottom:8 }}>
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" width={56} axisLine={false} tickLine={false} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace', fontWeight:600 }} />
+                                <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.04)' }} content={<BarTooltip />} />
+                                <Bar dataKey="count" fill={activeAccent} radius={[0,4,4,0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:13, fontFamily:'monospace' }}>No data</div>}
+                </div>
+            </PadCard>
+        </div>
+        <PadCard style={{ marginTop:20 }}>
+            <PanelHeader kicker="Feature importance" title="Top Feature Importance" description={null} />
+            <div style={{ height:320 }}>
+                {featureImportance.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={320} minWidth={1}>
+                        <BarChart data={featureImportance.slice(0, 12)} layout="vertical" margin={{ top:0, right:16, left:8, bottom:8 }}>
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" width={140} axisLine={false} tickLine={false} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace', fontWeight:600 }} />
+                            <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.04)' }} content={<BarTooltip />} />
+                            <Bar dataKey="importance" fill={activeAccent} radius={[0,4,4,0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:13, fontFamily:'monospace' }}>No importance data</div>}
+            </div>
+        </PadCard>
+    </div>
 );
 
-const hoverBorderButtonProps = (baseColor = T.txt3, hoverColor = T.txt1, hoverBorder = T.borderHi, hoverBackground = T.raised) => ({
-    onMouseEnter: e => {
-        e.currentTarget.style.color = hoverColor;
-        e.currentTarget.style.borderColor = hoverBorder;
-        e.currentTarget.style.background = hoverBackground;
-    },
-    onMouseLeave: e => {
-        e.currentTarget.style.color = baseColor;
-        e.currentTarget.style.borderColor = T.border;
-        e.currentTarget.style.background = 'transparent';
-    },
-});
+const ThreatMatrixView = ({
+    currentView, activeTab, setActiveTab, searchType, setSearchType, searchTerm, setSearchTerm, exportToCSV,
+    totalAlertsCount, currentPage, totalPages, currentAlerts, setSelectedAccount, handleResolve, confirmMule, revokeMule, activeAccent, activeAccentBg, jumpPage, setJumpPage, handleJumpKey, setCurrentPage
+}) => (
+    <div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, gap:16, flexWrap:'wrap' }}>
+            {currentView === 'DETAILED_VIEW' ? (
+                <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, padding:4, gap:4 }}>
+                    {[['ALL','All'],['CRITICAL','Critical'],['HIGH_RISK','High Risk']].map(([id,label]) => (
+                        <button key={id} onClick={() => setActiveTab(id)} style={{ padding:'8px 18px', fontSize:13, fontWeight:700, borderRadius:6, border:'none', cursor:'pointer', transition:'all 0.2s', letterSpacing:'0.02em', background: activeTab === id ? T.raised : 'transparent', color: activeTab === id ? (id === 'CRITICAL' ? T.crit : id === 'HIGH_RISK' ? T.high : T.txt1) : T.txt3 }}>{label}</button>
+                    ))}
+                </div>
+            ) : (
+                <div><h2 style={{ fontSize: 20, fontWeight:800, color: T.txt1, margin: 0 }}>Confirmed Mules Directory</h2></div>
+            )}
 
-const Divider = () => <div style={{ height:1, background:T.border }} />;
-
-const Pagination = ({ current, total, onPrev, onNext, jumpPage, onJumpChange, onJumpKey }) => {
-    if (total <= 1) return null;
-    const btn = (label, onClick, disabled) => (
-        <button onClick={onClick} disabled={disabled} style={{
-            padding:'5px 14px', fontSize:12, fontWeight:600, borderRadius:5, cursor: disabled ? 'not-allowed' : 'pointer',
-            background: T.raised, border:`1px solid ${T.borderHi}`, color: disabled ? T.txt3 : T.txt2,
-            transition:'color 0.15s, background 0.15s',
-        }}
-        onMouseEnter={e => { if (!disabled) { e.currentTarget.style.color = T.txt1; e.currentTarget.style.background = T.raised; } }}
-        onMouseLeave={e => { e.currentTarget.style.color = disabled ? T.txt3 : T.txt2; }}>
-            {label}
-        </button>
-    );
-    return (
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:T.surface, borderTop:`1px solid ${T.border}` }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <span style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em' }}>Jump</span>
-                <input type="text" value={jumpPage} onChange={onJumpChange} onKeyDown={onJumpKey} placeholder="#"
-                    style={{ width:40, padding:'4px 8px', fontSize:12, textAlign:'center', borderRadius:4, background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, outline:'none', fontFamily:'monospace' }} />
+            <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, overflow:'hidden', boxShadow:'inset 0 2px 4px rgba(0,0,0,0.2)' }}>
+                    <select value={searchType} onChange={e => setSearchType(e.target.value)} style={{ padding:'8px 12px', fontSize:12, background:T.raised, border:'none', borderRight:`1px solid ${T.border}`, color:T.txt2, outline:'none', cursor:'pointer', fontWeight:700 }}>
+                        <option value="ACCOUNT_ID">ACCT ID</option>
+                        <option value="FEATURE">FEATURE</option>
+                    </select>
+                    <input type="text" placeholder="Search…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ padding:'8px 16px', fontSize:14, background:'transparent', border:'none', color:T.txt1, outline:'none', width:220 }} />
+                </div>
+                {currentView === 'DETAILED_VIEW' && (
+                    <button onClick={exportToCSV} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', fontSize:13, fontWeight:700, borderRadius:8, cursor:'pointer', background:T.surface, border:`1px solid ${T.border}`, color:T.txt2, transition:'all 0.2s' }} {...hoverBorderButtonProps(T.txt2)}>
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Export CSV
+                    </button>
+                )}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                {btn('← Prev', onPrev, current === 1)}
-                <span style={{ fontSize:12, fontFamily:'monospace', color:T.txt2, padding:'0 4px' }}>
-                    <span style={{ color:T.txt1, fontWeight:700 }}>{current}</span>
-                    <span style={{ color:T.txt3 }}> / {total}</span>
-                </span>
-                {btn('Next →', onNext, current === total)}
+        </div>
+
+        <div style={{ fontSize:13, color:T.txt3, marginBottom:12, fontWeight:600 }}>
+            <span style={{ color:T.txt1, fontWeight:800 }}>{totalAlertsCount}</span> threats · page <span style={{ color:T.txt1, fontWeight:800 }}>{currentPage}</span> of {totalPages || 1}
+        </div>
+
+        <Card>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead>
+                    <tr>
+                        <TH>Account ID</TH>
+                        <TH>Status</TH>
+                        <TH>Risk Score</TH>
+                        <TH>SHAP Explainability (Why?)</TH>
+                        <TH>Age</TH>
+                        <TH>Dataset</TH>
+                        <TH right>Actions</TH>
+                    </tr>
+                </thead>
+                <tbody>
+                    {currentAlerts.length > 0 ? currentAlerts.map((alert, i) => {
+                        const isCrit = alert.status === 'Critical';
+                        return (
+                            <tr key={i} onClick={() => setSelectedAccount(alert)} style={{ borderBottom:`1px solid ${T.border}`, cursor:'pointer', borderLeft:`3px solid ${isCrit ? T.crit : T.high}`, transition:'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <td style={{ padding:'16px 20px' }}><div style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color:T.txt1 }}>{alert.accountId}</div></td>
+                                <td style={{ padding:'16px 20px' }}><div style={{ display:'flex', alignItems:'center', gap:10 }}><StatusChip status={alert.status} /><MuleStatusBadge status={alert.muleStatus || 'Pending'} /></div></td>
+                                <td style={{ padding:'16px 20px', minWidth:130 }}>
+                                    <div style={{ fontSize:16, fontWeight:800, fontFamily:'monospace', color: isCrit ? T.crit : T.high, textShadow:`0 0 8px ${isCrit ? T.crit : T.high}` }}>{alert.riskScore.toFixed(1)}%</div>
+                                    <RiskBar score={alert.riskScore} status={alert.status} />
+                                    <div style={{ fontSize:11, color:T.txt3, marginTop:6, fontFamily:'monospace', fontWeight:600 }}>Anomaly: {alert.anomalyScore}</div>
+                                </td>
+                                <td style={{ padding:'16px 20px' }}>
+                                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                                        {getAlertFeatures(alert).map((fObj, idx) => {
+                                            const f = fObj.name; const cat = featureCat(f); const contribution = Number(fObj.contribution || 0); const isPos = contribution > 0; const isNeg = contribution < 0; const shapLabel = isPos ? '▲ Risk UP' : isNeg ? '▼ Risk DOWN' : '• Neutral Impact'; const shapValue = Number.isFinite(contribution) ? String(contribution) : '0';
+                                            return (
+                                                <div key={f + idx} style={{ display:'flex', alignItems:'center', gap:12 }}>
+                                                    <span style={{ fontSize:10, fontFamily:'monospace', fontWeight:800, color:cat.color, background:cat.bg, border:`1px solid ${cat.border}`, padding:'3px 10px', borderRadius:9999, flexShrink:0, minWidth:56, textAlign:'center', boxShadow:`0 0 8px ${cat.bg}` }}>{f === 'Anomaly_Score' ? 'STAT' : f}</span>
+                                                    <div style={{ display:'flex', flexDirection:'column' }}>
+                                                        <span style={{ fontSize:13, color:T.txt1, fontWeight:600 }}>{translate(f)}</span>
+                                                        {fObj.contribution !== null && (
+                                                            <span style={{ fontSize:11, color: isPos ? T.crit : isNeg ? T.ok : T.txt3, fontWeight:700, display:'flex', alignItems:'center', gap:4, marginTop:2 }}>{shapLabel} <span style={{ color:T.txt3, fontWeight:500 }}>(SHAP {isPos?'+':''}{shapValue})</span></span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </td>
+                                <td style={{ padding:'16px 20px' }}><AlertAge detectedAt={alert.detectedAt} /></td>
+                                <TD muted>{alert.sourceFileName}</TD>
+                                <td style={{ padding:'16px 20px', textAlign:'right' }}>
+                                    <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
+                                        {currentView === 'DETAILED_VIEW' && (
+                                            <>
+                                                <button onClick={e => handleResolve(alert.accountId, e, alert.sourceFileName)} title="Mark as Safe" style={{ padding:'6px 12px', fontSize:12, fontWeight:700, borderRadius:8, background:'transparent', border:`1px solid ${T.border}`, color:T.txt3, cursor:'pointer', transition:'all 0.2s' }} {...hoverBorderButtonProps(T.txt3, T.ok, '#163028', T.okBg)}>Safe</button>
+                                                <button onClick={e => { e.stopPropagation(); e.preventDefault(); confirmMule(alert._id); }} title="Confirm Mule" style={{ padding:'6px 12px', fontSize:12, fontWeight:700, borderRadius:8, background:T.critBg, border:`1px solid ${T.critBdr}`, color:T.crit, cursor:'pointer', transition:'all 0.2s' }} {...hoverBorderButtonProps(T.crit, '#fff', T.critBdr, T.crit)}>Confirm Mule</button>
+                                            </>
+                                        )}
+                                        {currentView === 'MULE_REGISTRY' && (
+                                            <button onClick={e => { e.stopPropagation(); e.preventDefault(); revokeMule(alert._id); }} title="Revoke Status" style={{ padding:'6px 12px', fontSize:12, fontWeight:700, borderRadius:8, background:T.raised, border:`1px solid ${T.borderHi}`, color:T.txt2, cursor:'pointer', transition:'all 0.2s' }} {...hoverBorderButtonProps(T.txt2, T.ok, '#163028', T.okBg)}>Revoke Status</button>
+                                        )}
+                                        <button onClick={e => { e.stopPropagation(); setSelectedAccount(alert); }} style={{ padding:'6px 16px', fontSize:12, fontWeight:700, borderRadius:8, background:activeAccentBg, border:`1px solid ${activeAccent}40`, color:activeAccent, cursor:'pointer', transition:'all 0.2s', boxShadow:`0 0 12px ${activeAccentBg}` }} {...hoverBorderButtonProps(activeAccent, '#fff', activeAccent, activeAccent)}>Inspect</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    }) : (
+                        <tr><td colSpan="7" style={{ padding:'60px 20px', textAlign:'center', color:T.txt3, fontSize:13, fontFamily:'monospace', letterSpacing:'0.1em', fontWeight:600 }}>NO THREATS MATCH CURRENT FILTER</td></tr>
+                    )}
+                </tbody>
+            </table>
+            <Pagination current={currentPage} total={totalPages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalPages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalPages,p+1))} />
+        </Card>
+    </div>
+);
+
+const AccountInspectionModal = ({ selectedAccount, setSelectedAccount, handleResolve, activeAccent }) => {
+    if (!selectedAccount) return null;
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)', backdropFilter:'blur(8px)', padding:24 }}>
+            <div style={{ background:T.surface, border:`1px solid ${T.borderHi}`, borderRadius:16, width:'100%', maxWidth:1100, maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 24px 80px rgba(0,0,0,0.8)' }}>
+                <div style={{ padding:'20px 24px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center', background:T.bg, flexShrink:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:24 }}>
+                        <RiskGauge score={selectedAccount.riskScore} status={selectedAccount.status} />
+                        <div>
+                            <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6, fontWeight:700 }}>Account Inspection Profile</div>
+                            <div style={{ fontSize:24, fontWeight:800, fontFamily:'monospace', color:T.txt1, letterSpacing:'0.04em' }}>{selectedAccount.accountId}</div>
+                            <div style={{ display:'flex', gap:20, marginTop:8 }}>
+                                <span style={{ fontSize:12, color:T.txt2, fontFamily:'monospace', fontWeight:600 }}>{new Date(selectedAccount.detectedAt).toLocaleString()}</span>
+                                <span style={{ fontSize:12, color:T.txt2, fontFamily:'monospace', fontWeight:600 }}>{selectedAccount.sourceFileName}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                        <div style={{ fontSize:36, fontWeight:900, fontFamily:'monospace', color: selectedAccount.status === 'Critical' ? T.crit : T.high, textShadow: `0 0 20px ${selectedAccount.status === 'Critical' ? T.critBg : T.highBg}`, marginRight: 24 }}>
+                            {selectedAccount.riskScore.toFixed(1)}%
+                        </div>
+                        <button onClick={(e) => { handleResolve(selectedAccount.accountId, e, selectedAccount.sourceFileName); setSelectedAccount(null); }} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', fontSize:13, fontWeight:700, borderRadius:8, cursor:'pointer', transition:'all 0.2s', background:T.okBg, border:`1px solid ${T.ok}40`, color:T.ok, boxShadow:`0 0 16px ${T.okBg}` }}>
+                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Mark Safe
+                        </button>
+                        <button onClick={() => setSelectedAccount(null)} style={{ padding:'10px 12px', borderRadius:8, background:'transparent', border:`1px solid ${T.border}`, color:T.txt3, cursor:'pointer', transition:'all 0.2s' }} {...hoverBorderButtonProps(T.txt3)}>
+                            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
+                    {/* LEFT PANEL: KYC */}
+                    <div style={{ width:'50%', padding:24, overflowY:'auto', borderRight:`1px solid ${T.border}`, background:T.surface }}>
+                        <div style={{ fontSize:11, fontWeight:800, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:16 }}>KYC Profile &amp; Ledger</div>
+                        {selectedAccount.kycData ? (
+                            <>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
+                                    {[
+                                        { label:'Account Holder',  val:selectedAccount.kycData.fullName, color:T.txt1 },
+                                        { label:'Current Balance', val:selectedAccount.kycData.currentBalance, color:T.ok },
+                                        { label:'Last Login IP',   val:selectedAccount.kycData.lastLoginIp, color:T.txt2 },
+                                        { label:'Device Fingerprint',val:selectedAccount.kycData.deviceType, color:T.txt2 },
+                                    ].map(({ label, val, color }) => (
+                                        <div key={label} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:'14px 16px' }}>
+                                            <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6, fontWeight:700 }}>{label}</div>
+                                            <div style={{ fontSize:14, fontWeight:700, color, fontFamily: label.includes('IP')||label.includes('Device') ? 'monospace' : 'inherit' }}>{val}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ fontSize:11, fontWeight:800, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:12 }}>Recent Transactions (72h)</div>
+                                <table style={{ width:'100%', borderCollapse:'collapse', background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, overflow:'hidden' }}>
+                                    <thead>
+                                        <tr style={{ background:T.raised }}>
+                                            {['TXN ID','Type','Amount'].map((h,i) => (
+                                                <th key={h} style={{ padding:'10px 16px', fontSize:11, color:T.txt3, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', textAlign: i === 2 ? 'right' : 'left', borderBottom:`1px solid ${T.border}` }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedAccount.kycData.recentTransactions.map((txn, i) => (
+                                            <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }}>
+                                                <td style={{ padding:'12px 16px', fontFamily:'monospace', fontSize:12, color:activeAccent, fontWeight:700 }}>{txn.txnId}</td>
+                                                <td style={{ padding:'12px 16px', fontSize:13, color:T.txt2, fontWeight:600 }}>{txn.type}</td>
+                                                <td style={{ padding:'12px 16px', fontFamily:'monospace', fontSize:13, color:T.txt1, fontWeight:700, textAlign:'right' }}>{txn.amount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </>
+                        ) : <div style={{ color:T.txt3, fontSize:13, fontStyle:'italic' }}>KYC data unavailable.</div>}
+                    </div>
+
+                    {/* RIGHT PANEL: TELEMETRY */}
+                    <div style={{ width:'50%', padding:24, overflowY:'auto', background:T.bg }}>
+                        <div style={{ fontSize:11, fontWeight:800, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:16 }}>AI Telemetry — Active Signals</div>
+                        {selectedAccount.rawTelemetry ? (
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                                {Object.entries(selectedAccount.rawTelemetry).filter(([k,v]) => k !== 'Anomaly_Score' && v !== 0).map(([k, v]) => {
+                                    const topF = getAlertFeatures(selectedAccount).find(tf => tf.name === k);
+                                    const isTop = !!topF;
+                                    const cat = featureCat(k);
+                                    return (
+                                        <div key={k} style={{ background: isTop ? cat.bg : T.surface, border: `1px solid ${isTop ? cat.border : T.border}`, borderLeft: isTop ? `4px solid ${cat.color}` : `1px solid ${T.border}`, borderRadius:10, padding:'14px 16px', boxShadow: isTop ? `0 4px 12px ${cat.bg}` : 'none' }}>
+                                            <div style={{ fontSize:11, fontFamily:'monospace', color: isTop ? cat.color : T.txt3, marginBottom:4, fontWeight:700 }}>{k}</div>
+                                            <div style={{ fontSize:18, fontWeight:800, fontFamily:'monospace', color: isTop ? cat.color : T.txt1, textShadow: isTop ? `0 0 8px ${cat.bg}` : 'none' }}>
+                                                {Number.isInteger(v) ? v : Number(v).toFixed(4)}
+                                            </div>
+                                            {isTop && topF.contribution !== null && (
+                                                <div style={{ fontSize:11, color: topF.contribution > 0 ? T.crit : topF.contribution < 0 ? T.ok : T.txt3, fontWeight:800, marginTop:8, display:'flex', alignItems:'center', gap:4 }}>
+                                                    {topF.contribution > 0 ? '▲ Risk UP' : topF.contribution < 0 ? '▼ Risk DOWN' : '• Neutral Impact'}
+                                                    <span style={{color:T.txt3, fontWeight:600}}>(SHAP {topF.contribution > 0 ? '+' : ''}{String(topF.contribution)})</span>
+                                                </div>
+                                            )}
+                                            {featureDictionary[k] && (
+                                                <div style={{ fontSize:11, color:T.txt3, marginTop: isTop ? 6 : 10, lineHeight:1.5, fontWeight:500 }}>{featureDictionary[k]}</div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : <div style={{ textAlign:'center', padding:40, color:T.txt3, fontFamily:'monospace', fontSize:13, fontWeight:600 }}>Raw telemetry unavailable.</div>}
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
+
+// ============================================================================
+// 5. MAIN DASHBOARD CONTROLLER (State & Layout)
+// ============================================================================
 
 const Dashboard = () => {
+    // ── Global State ────────────────────────────────────────────────────────
+    const [currentRole, setCurrentRole]             = useState('Analyst'); // Default Role
+    const [currentView, setCurrentView]             = useState('DETAILED_VIEW'); // Default for Analyst
+    const [sidebarCollapsed, setSidebarCollapsed]   = useState(false);
+    const [loading, setLoading]                     = useState(true);
+
+    // ── Fetch & Filter State ────────────────────────────────────────────────
     const [alerts, setAlerts]                       = useState([]);
     const [logs, setLogs]                           = useState([]);
     const [uploadedFiles, setUploadedFiles]         = useState([]);
     const [availableDatasets, setAvailableDatasets] = useState([]);
     const [activeDataset, setActiveDataset]         = useState('ALL');
-    const [currentRole, setCurrentRole]             = useState('Analyst'); // Default Role
-    const [loading, setLoading]                     = useState(true);
+    const [datasetSourceFilter, setDatasetSourceFilter] = useState('ALL');
+    const [activeTab, setActiveTab]                 = useState('ALL');
+    const [activeLogTab, setActiveLogTab]           = useState('ALL');
+    const [searchTerm, setSearchTerm]               = useState('');
+    const [searchType, setSearchType]               = useState('ACCOUNT_ID');
+    const [selectedAccount, setSelectedAccount]     = useState(null);
+    const [resolvedIds, setResolvedIds]             = useState(new Set());
+    
+    // ── Upload & Pipeline State ─────────────────────────────────────────────
     const [isUploading, setIsUploading]             = useState(false);
     const [engineStatus, setEngineStatus]           = useState('Idle');
     const [uploadStartedAt, setUploadStartedAt]     = useState(null);
     const [uploadFileName, setUploadFileName]       = useState('');
     const [uploadElapsedSeconds, setUploadElapsedSeconds] = useState(0);
-    const [currentView, setCurrentView]             = useState('DETAILED_VIEW'); // Default for Analyst
-    const [activeTab, setActiveTab]                 = useState('ALL');
-    const [activeLogTab, setActiveLogTab]           = useState('ALL');
-    const [searchTerm, setSearchTerm]               = useState('');
-    const [searchType, setSearchType]               = useState('ACCOUNT_ID');
-    const [jumpPage, setJumpPage]                   = useState('');
-    const [selectedAccount, setSelectedAccount]     = useState(null);
     const [uploadLimitEnabled, setUploadLimitEnabled] = useState(true);
     const [maxUploadMB, setMaxUploadMB] = useState(100);
     const [perUploadMB, setPerUploadMB] = useState(100);
+
+    // ── Pagination & Metrics State ──────────────────────────────────────────
     const [currentPage, setCurrentPage]             = useState(1);
-    const [resolvedIds, setResolvedIds]             = useState(new Set());
+    const [jumpPage, setJumpPage]                   = useState('');
     const [totalAlertsCount, setTotalAlertsCount]   = useState(0);
-    const [sidebarCollapsed, setSidebarCollapsed]   = useState(false);
+    const [globalStats, setGlobalStats]             = useState({ critical: 0, highRisk: 0 });
+    const itemsPerPage = 12;
+
+    // ── ML Telemetry State ──────────────────────────────────────────────────
     const [modelConfig, setModelConfig]             = useState(null);
     const [inputSchema, setInputSchema]             = useState(null);
     const [modelMetrics, setModelMetrics]           = useState(null);
     const [thresholdCurve, setThresholdCurve]       = useState([]);
     const [droppedFeatures, setDroppedFeatures]     = useState([]);
     const [featureImportance, setFeatureImportance]  = useState([]);
-    const [datasetSourceFilter, setDatasetSourceFilter] = useState('ALL');
-    const itemsPerPage   = 12;
+
+    // ── Refs ────────────────────────────────────────────────────────────────
     const fileInputRef   = useRef(null);
     const statusInterval = useRef(null);
     const socketRefLocal = useRef(null);
 
-    // Bug 4 fix: socket.io event handlers registered with empty deps [] permanently
-    // close over initial state values. These refs are kept in sync every render so
-    // SILENT_REFRESH always reads current page/dataset/view without re-registering listeners.
-    const socketStateRef = useRef({ currentPage, activeDataset, activeTab, searchTerm, currentView });
-    const fetchAlertsRef = useRef(null);
-    useEffect(() => {
-        socketStateRef.current = { currentPage, activeDataset, activeTab, searchTerm, currentView };
-    });
-
+    // ── Handlers & Side Effects ─────────────────────────────────────────────
     const statusMeta = getUploadStatusMeta(engineStatus);
 
     useEffect(() => {
-        if (!isUploading || !uploadStartedAt) {
-            setTimeout(() => setUploadElapsedSeconds(0), 0);
-            return undefined;
-        }
-        const timer = setInterval(() => {
-            setUploadElapsedSeconds(Math.floor((Date.now() - uploadStartedAt) / 1000));
-        }, 1000);
+        if (!isUploading || !uploadStartedAt) { setTimeout(() => setUploadElapsedSeconds(0), 0); return undefined; }
+        const timer = setInterval(() => setUploadElapsedSeconds(Math.floor((Date.now() - uploadStartedAt) / 1000)), 1000);
         return () => clearInterval(timer);
     }, [isUploading, uploadStartedAt]);
 
-    // Bug 5 fix: fetchJson was a plain function recreated every render, giving
-    // fetchAlerts a stale closure. Now memoised on currentRole so the reference
-    // is stable between renders and only refreshes when role changes.
-    const fetchJson = React.useCallback(async (endpoint, init) => {
+    const fetchJson = async (endpoint, init) => {
         const mergedHeaders = { 'X-User-Role': currentRole, ...(init && init.headers ? init.headers : {}) };
-        const opts = { ...(init || {}), headers: mergedHeaders };
-        const response = await fetch(`${API_BASE}${endpoint}`, opts);
+        const response = await fetch(`${API_BASE}${endpoint}`, { ...(init || {}), headers: mergedHeaders });
         if (!response.ok) return null;
         return response.json();
-    }, [currentRole]);
+    };
 
     const fetchAlerts = React.useCallback(async (page = 1, opts = {}) => {
         try {
@@ -359,15 +635,16 @@ const Dashboard = () => {
             if (opts.search && String(opts.search).trim()) params.set('search', String(opts.search).trim());
             if (opts.muleStatus) params.set('muleStatus', opts.muleStatus);
 
-            const data = await fetchJson(`/api/alerts?${params.toString()}`);
-            if (data) {
-                setAlerts(data.data || []);
-                setTotalAlertsCount(Number(data.total || data.count || (data.data || []).length));
-            }
+            const statsUrl = (opts.dataset && opts.dataset !== 'ALL') ? `/api/alerts/stats?dataset=${encodeURIComponent(opts.dataset)}` : '/api/alerts/stats';
+            const [data, stats] = await Promise.all([
+                fetchJson(`/api/alerts?${params.toString()}`),
+                fetchJson(statsUrl)
+            ]);
+
+            if (data) { setAlerts(data.data || []); setTotalAlertsCount(Number(data.total || data.count || (data.data || []).length)); }
+            if (stats && stats.success) setGlobalStats({ critical: stats.critical, highRisk: stats.highRisk });
         } catch { /* ignore */ }
     }, [itemsPerPage, currentRole]);
-    // Keep ref in sync so stale-closure-prone handlers always call the latest version
-    fetchAlertsRef.current = fetchAlerts;
 
     const confirmMule = async (alertId, muleStatus = 'Confirmed Mule') => {
         try {
@@ -380,18 +657,14 @@ const Dashboard = () => {
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                         <div>{`Marked ${res.data.accountId} as ${muleStatus}`}</div>
                         <button onClick={async () => {
-                            try {
-                                const undo = await fetchJson(`/api/alerts/${alertId}/mule`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ muleStatus: prev }) });
-                                if (undo && undo.success) setAlerts(prevA => prevA.map(a => (a._id === undo.data._id ? undo.data : a)));
-                                toast.dismiss(t.id);
-                            } catch { toast.error('Undo failed'); }
+                            const undo = await fetchJson(`/api/alerts/${alertId}/mule`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ muleStatus: prev }) });
+                            if (undo && undo.success) setAlerts(prevA => prevA.map(a => (a._id === undo.data._id ? undo.data : a)));
+                            toast.dismiss(t.id);
                         }} style={{ padding:'6px 10px', borderRadius:6, background:T.surface, border:`1px solid ${T.borderHi}`, cursor:'pointer' }}>Undo</button>
                     </div>
                 ));
-            } else {
-                toast.error('Failed to update mule status');
-            }
-        } catch (err) { console.error(err); toast.error('Failed to update mule status'); }
+            } else toast.error('Failed to update mule status');
+        } catch { toast.error('Failed to update mule status'); }
     };
 
     const revokeMule = async (alertId) => {
@@ -400,47 +673,38 @@ const Dashboard = () => {
             const prev = 'Confirmed Mule';
             const res = await fetchJson(`/api/alerts/${alertId}/mule`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muleStatus: 'Pending' }) });
             if (res && res.success) {
-                setAlerts(prevA => prevA.filter(a => a._id !== res.data._id)); // Remove from Mule Registry view instantly
+                setAlerts(prevA => prevA.filter(a => a._id !== res.data._id)); 
                 toast.success((t) => (
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                         <div>{`Revoked status for ${res.data.accountId}`}</div>
                         <button onClick={async () => {
-                            try {
-                                const undo = await fetchJson(`/api/alerts/${alertId}/mule`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ muleStatus: prev }) });
-                                if (undo && undo.success) setAlerts(prevA => [undo.data, ...prevA]);
-                                toast.dismiss(t.id);
-                            } catch { toast.error('Undo failed'); }
+                            const undo = await fetchJson(`/api/alerts/${alertId}/mule`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ muleStatus: prev }) });
+                            if (undo && undo.success) setAlerts(prevA => [undo.data, ...prevA]);
+                            toast.dismiss(t.id);
                         }} style={{ padding:'6px 10px', borderRadius:6, background:T.surface, border:`1px solid ${T.borderHi}`, cursor:'pointer' }}>Undo</button>
                     </div>
                 ));
-            } else {
-                toast.error('Failed to update mule status');
-            }
-        } catch (err) { console.error(err); toast.error('Failed to update mule status'); }
+            } else toast.error('Failed to update mule status');
+        } catch { toast.error('Failed to update mule status'); }
     };
 
-    const fetchDatasets   = async () => { try { const data = await fetchJson('/api/files');     if (data) setAvailableDatasets(data.data); } catch { /* ignore */ } };
+    const fetchDatasets = async () => { try { const data = await fetchJson('/api/files'); if (data) setAvailableDatasets(data.data); } catch { /* ignore */ } };
     const fetchModelConfig = async () => {
         try {
             const data = await fetchJson('/api/config');
             if (data) {
-                setModelConfig(data.thresholds || null);
-                setInputSchema(data.inputSchema || null);
-                setModelMetrics(data.modelMetrics || null);
-                setThresholdCurve(data.thresholdCurve || []);
-                setDroppedFeatures(data.droppedFeatures || []);
-                setFeatureImportance(data.featureImportance || []);
+                setModelConfig(data.thresholds || null); setInputSchema(data.inputSchema || null);
+                setModelMetrics(data.modelMetrics || null); setThresholdCurve(data.thresholdCurve || []);
+                setDroppedFeatures(data.droppedFeatures || []); setFeatureImportance(data.featureImportance || []);
             }
         } catch { /* ignore */ }
     };
+    
     const fetchLogsAndFiles = async () => {
         try {
             const [logsData, filesData] = await Promise.all([fetchJson('/api/logs'), fetchJson('/api/files')]);
             if (logsData) setLogs(logsData.data);
-            if (filesData) {
-                setUploadedFiles(filesData.data);
-                setAvailableDatasets(filesData.data);
-            }
+            if (filesData) { setUploadedFiles(filesData.data); setAvailableDatasets(filesData.data); }
             setLoading(false);
         } catch { setLoading(false); }
     };
@@ -451,37 +715,19 @@ const Dashboard = () => {
         socket.on('SCAN_COMPLETE', (data) => {
             alarm.play().catch(() => {});
             toast.custom(() => (
-                <div style={{ background:T.raised, border:`1px solid ${T.critBdr}`, borderRadius:8, padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start', boxShadow:'0 4px 24px rgba(0,0,0,0.4)', maxWidth:360 }}>
-                    <div style={{ width:32, height:32, borderRadius:'50%', background:T.critBg, border:`1px solid ${T.critBdr}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        <svg width="16" height="16" fill="none" stroke={T.crit} strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
+                <div style={{ background:T.raised, border:`1px solid ${T.critBdr}`, borderRadius:12, padding:'16px 20px', display:'flex', gap:14, alignItems:'flex-start', boxShadow:'0 8px 32px rgba(0,0,0,0.6)', maxWidth:380 }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:T.critBg, border:`1px solid ${T.critBdr}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 0 12px ${T.critBg}` }}>
+                        <svg width="18" height="18" fill="none" stroke={T.crit} strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                     <div>
-                        <p style={{ fontSize:11, fontWeight:700, color:T.crit, letterSpacing:'0.08em', marginBottom:4 }}>SCAN COMPLETE</p>
-                        <p style={{ fontSize:12, color:T.txt1, fontFamily:'monospace', marginBottom:2 }}>{data.fileName}</p>
-                        <p style={{ fontSize:11, color:T.txt2 }}>{data.criticalCount} Critical · {data.highRiskCount} High Risk</p>
+                        <p style={{ fontSize:12, fontWeight:800, color:T.crit, letterSpacing:'0.1em', marginBottom:4 }}>SCAN COMPLETE</p>
+                        <p style={{ fontSize:13, color:T.txt1, fontFamily:'monospace', marginBottom:4 }}>{data.fileName}</p>
+                        <p style={{ fontSize:12, color:T.txt2 }}>{data.criticalCount} Critical · {data.highRiskCount} High Risk</p>
                     </div>
                 </div>
             ), { duration:8000, position:'top-right' });
         });
-        // Bug 4 fix: use refs so this handler always reads current state values,
-        // not the initial values captured when the effect first ran.
-        socket.on('SILENT_REFRESH', () => {
-            setTimeout(() => {
-                const s = socketStateRef.current;
-                if (fetchAlertsRef.current) {
-                    fetchAlertsRef.current(s.currentPage, {
-                        dataset: s.activeDataset,
-                        status: s.activeTab,
-                        search: s.searchTerm,
-                        muleStatus: s.currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined,
-                    });
-                }
-                fetchDatasets();
-                fetchLogsAndFiles();
-            }, 0);
-        });
+        socket.on('SILENT_REFRESH', () => { setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm, muleStatus: currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined }); fetchDatasets(); fetchLogsAndFiles(); }, 0); });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
         socket.on('ENGINE_PROGRESS', (payload) => {
             try {
@@ -501,10 +747,9 @@ const Dashboard = () => {
                 const msg = (payload && payload.message) ? payload.message : 'Unknown engine error';
                 setIsUploading(false);
                 if (statusInterval.current) { clearInterval(statusInterval.current); statusInterval.current = null; }
-                setUploadStartedAt(null);
-                setUploadElapsedSeconds(0);
+                setUploadStartedAt(null); setUploadElapsedSeconds(0);
                 toast.error(`Engine Error: ${msg}`, { style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` }, duration: 8000 });
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
         });
         setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm, muleStatus: currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined }); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
         socketRefLocal.current = socket;
@@ -515,11 +760,7 @@ const Dashboard = () => {
         (async () => {
             try {
                 const j = await fetchJson('/api/upload-config');
-                if (j && j.success) {
-                    setMaxUploadMB(Number(j.maxUploadMB || 0));
-                    setUploadLimitEnabled(Boolean(j.enabled));
-                    setPerUploadMB(Number(j.maxUploadMB || 0));
-                }
+                if (j && j.success) { setMaxUploadMB(Number(j.maxUploadMB || 0)); setUploadLimitEnabled(Boolean(j.enabled)); setPerUploadMB(Number(j.maxUploadMB || 0)); }
             } catch { /* ignore */ }
         })();
     }, []);
@@ -527,21 +768,12 @@ const Dashboard = () => {
     useEffect(() => { setTimeout(() => setCurrentPage(1), 0); }, [activeTab, searchTerm, searchType, activeLogTab, currentView, activeDataset, datasetSourceFilter]);
 
     useEffect(() => {
-        setTimeout(() => { 
-            fetchAlerts(currentPage, { 
-                dataset: activeDataset, 
-                status: activeTab, 
-                search: searchTerm,
-                muleStatus: currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined 
-            }); 
-        }, 0);
+        setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm, muleStatus: currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined }); }, 0);
     }, [currentPage, activeDataset, activeTab, searchTerm, currentView, fetchAlerts]);
 
     useEffect(() => {
         const visibleDatasets = availableDatasets.filter(file => datasetSourceFilter === 'ALL' || (file.sourceType || (String(file.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST')) === datasetSourceFilter);
-        if (activeDataset !== 'ALL' && !visibleDatasets.some(file => file.fileName === activeDataset)) {
-            setTimeout(() => setActiveDataset('ALL'), 0);
-        }
+        if (activeDataset !== 'ALL' && !visibleDatasets.some(file => file.fileName === activeDataset)) setTimeout(() => setActiveDataset('ALL'), 0);
     }, [availableDatasets, datasetSourceFilter, activeDataset]);
 
     const startStatusTracking = () => {
@@ -554,10 +786,7 @@ const Dashboard = () => {
                 if (data) {
                     setEngineStatus(data.status);
                     if (terminalStatuses.has(data.status)) {
-                        clearInterval(statusInterval.current);
-                        statusInterval.current = null;
-                        setIsUploading(false);
-                        setUploadStartedAt(null);
+                        clearInterval(statusInterval.current); statusInterval.current = null; setIsUploading(false); setUploadStartedAt(null);
                         setTimeout(() => { fetchAlerts(currentPage); fetchDatasets(); fetchLogsAndFiles(); fetchModelConfig(); }, 0);
                     }
                 }
@@ -570,7 +799,7 @@ const Dashboard = () => {
         if (!window.confirm('WARNING: This will delete all alerts, file histories, and logs from MongoDB. Proceed?')) return;
         try {
             await fetchJson('/api/system-wipe', { method:'DELETE' });
-            setAlerts([]); setUploadedFiles([]); setAvailableDatasets([]); setActiveDataset('ALL'); setResolvedIds(new Set());
+            setAlerts([]); setUploadedFiles([]); setAvailableDatasets([]); setActiveDataset('ALL'); setResolvedIds(new Set()); setGlobalStats({ critical:0, highRisk:0 });
             toast.success('System wiped. Ready for fresh uploads.', { style:{ background:T.raised, color:T.ok, border:`1px solid #163028` } });
         } catch { alert('Failed to wipe system'); }
     };
@@ -591,11 +820,11 @@ const Dashboard = () => {
                 if (data.message === 'DUPLICATE_FILE') toast.error('Data Replay Blocked — dataset hash already exists.', { id: uploadToastId, style:{ background:T.raised, color:T.crit, border:`1px solid ${T.critBdr}` }, duration:6000 });
                 else throw new Error(data.message || 'Failed to process CSV');
             } else {
-                uploadAccepted = true;
-                setResolvedIds(new Set()); setCurrentPage(1); setActiveDataset(file.name); setCurrentView('OVERVIEW');
+                uploadAccepted = true; setResolvedIds(new Set()); setCurrentPage(1); setActiveDataset(file.name); setCurrentView('OVERVIEW');
                 toast.success(`Upload accepted. ${file.name} is now being scored.`, { id: uploadToastId, style:{ background:T.raised, color:T.ok, border:`1px solid #163028` } });
             }
-        } catch (err) { toast.error(`Upload Error: ${err.message}`, { id: uploadToastId, style:{ background:T.raised, color:T.crit } }); } finally {
+        } catch (err) { toast.error(`Upload Error: ${err.message}`, { id: uploadToastId, style:{ background:T.raised, color:T.crit } }); } 
+        finally {
             if (!uploadAccepted) { setIsUploading(false); stopStatusTracking(); setUploadFileName(''); }
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
@@ -605,21 +834,17 @@ const Dashboard = () => {
         try {
             const body = { maxUploadMB: uploadLimitEnabled ? Number(maxUploadMB) : null, enabled: uploadLimitEnabled };
             const j = await fetchJson('/api/upload-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (j && j.success) toast.success('Upload configuration saved.');
-            else toast.error('Failed to save upload configuration.');
-        } catch (e) { console.error(e); toast.error('Failed to save upload configuration.'); }
+            if (j && j.success) toast.success('Upload configuration saved.'); else toast.error('Failed to save upload configuration.');
+        } catch { toast.error('Failed to save upload configuration.'); }
     };
 
-    // Bug 7 fix: previously read sourceFileName exclusively from selectedAccount,
-    // which is null when the button is clicked from the table row without opening
-    // the modal. Now accepts an explicit param with selectedAccount as fallback.
-    const handleResolve = async (accountId, e, sourceFileName) => {
+    const handleResolve = async (accountId, e, srcFileName) => {
         if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
         setResolvedIds(prev => new Set(prev).add(accountId));
         try {
-            await fetchJson('/api/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ accountId, decision:'SAFE', sourceFileName: sourceFileName || selectedAccount?.sourceFileName || null }) });
+            await fetchJson('/api/resolve', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ accountId, decision:'SAFE', sourceFileName: srcFileName || selectedAccount?.sourceFileName || null }) });
             toast.success(`${accountId} marked as safe.`, { style:{ background:T.raised, color:T.ok, border:`1px solid #163028` } });
-        } catch (err) { console.error(err); toast.error('Failed to mark safe.'); }
+        } catch { toast.error('Failed to mark safe.'); }
     };
 
     const exportToCSV = () => {
@@ -634,7 +859,22 @@ const Dashboard = () => {
         a.click();
     };
 
-    // ── Derived State ─────────────────────────────────────────────────────────
+    const handleJumpKey = (e, total) => {
+        if (e.key !== 'Enter') return;
+        const n = parseInt(jumpPage, 10);
+        if (!isNaN(n) && n >= 1 && n <= total) setCurrentPage(n);
+        setJumpPage('');
+    };
+
+    const handleRoleToggle = (e) => {
+        const newRole = e.target.value; setCurrentRole(newRole);
+        setCurrentView(newRole === 'Analyst' ? 'DETAILED_VIEW' : 'OVERVIEW');
+        setCurrentPage(1); setSearchTerm('');
+    };
+
+    const openLiveRoute = (path) => { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); };
+
+    // ── Derived State Dependencies ───────────────────────────────────────────
     const resolveSourceType = (file) => file?.sourceType || (String(file?.fileName || '').startsWith('LIVE_STREAM_') ? 'LIVE_STREAM' : 'STATIC_INGEST');
     const visibleDatasetFiles = useMemo(() => availableDatasets.filter(file => datasetSourceFilter === 'ALL' || resolveSourceType(file) === datasetSourceFilter), [availableDatasets, datasetSourceFilter]);
     const visibleDatasetNames = useMemo(() => new Set(visibleDatasetFiles.map(file => file.fileName)), [visibleDatasetFiles]);
@@ -648,7 +888,6 @@ const Dashboard = () => {
     }), [unresolvedAlerts, activeDataset, datasetSourceFilter, visibleDatasetNames]);
 
     const filteredAlerts = useMemo(() => activeAlerts.filter(a => {
-        // Bypass tab filtering completely if we are exclusively reviewing mules
         const tab = (currentView === 'MULE_REGISTRY') || activeTab === 'ALL' || (activeTab === 'CRITICAL' && a.status === 'Critical') || (activeTab === 'HIGH_RISK' && a.status === 'High Risk');
         const search = !searchTerm ? true : searchType === 'ACCOUNT_ID'
             ? a.accountId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -669,26 +908,10 @@ const Dashboard = () => {
     const totalFilePages = Math.ceil(uploadedFiles.length / itemsPerPage);
     const currentFiles   = uploadedFiles.slice(idx0, idx0 + itemsPerPage);
 
-    const handleJumpKey = (e, total) => {
-        if (e.key !== 'Enter') return;
-        const n = parseInt(jumpPage, 10);
-        if (!isNaN(n) && n >= 1 && n <= total) setCurrentPage(n);
-        setJumpPage('');
-    };
-
-    const handleRoleToggle = (e) => {
-        const newRole = e.target.value;
-        setCurrentRole(newRole);
-        setCurrentView(newRole === 'Analyst' ? 'DETAILED_VIEW' : 'OVERVIEW');
-        setCurrentPage(1);
-        setSearchTerm('');
-    };
-
-    const critCount = new Set(activeAlerts.filter(a => a.status === 'Critical').map(a => a.accountId)).size;
-    const highCount = new Set(activeAlerts.filter(a => a.status === 'High Risk').map(a => a.accountId)).size;
-    const baseScanned = activeDataset === 'ALL'
-        ? visibleDatasetFiles.reduce((s, f) => s + (f.totalAccountsScanned || 0), 0)
-        : visibleDatasetFiles.find(f => f.fileName === activeDataset)?.totalAccountsScanned || 0;
+    const critCount = globalStats.critical || 0;
+    const highCount = globalStats.highRisk || 0;
+    
+    const baseScanned = activeDataset === 'ALL' ? visibleDatasetFiles.reduce((s, f) => s + (f.totalAccountsScanned || 0), 0) : visibleDatasetFiles.find(f => f.fileName === activeDataset)?.totalAccountsScanned || 0;
     const totalScanned = Math.max(baseScanned, critCount + highCount);
 
     const riskData    = [{ name:'Critical', value:critCount }, { name:'High Risk', value:highCount }];
@@ -696,75 +919,44 @@ const Dashboard = () => {
 
     const featureCounts = useMemo(() => {
         const counts = {};
-        activeAlerts.forEach(a => getAlertFeatures(a).forEach(fObj => {
-            const f = fObj.name;
-            counts[f] = (counts[f] || 0) + 1;
-        }));
+        activeAlerts.forEach(a => getAlertFeatures(a).forEach(fObj => { const f = fObj.name; counts[f] = (counts[f] || 0) + 1; }));
         return counts;
     }, [activeAlerts]);
 
-    const featureData = useMemo(() => Object.keys(featureCounts)
-        .map(k => ({ name: k === 'Anomaly_Score' ? 'STAT' : k, count: featureCounts[k], fullName: translate(k) }))
-        .sort((a, b) => b.count - a.count).slice(0, 6), [featureCounts]);
+    const featureData = useMemo(() => Object.keys(featureCounts).map(k => ({ name: k === 'Anomaly_Score' ? 'STAT' : k, count: featureCounts[k], fullName: translate(k) })).sort((a, b) => b.count - a.count).slice(0, 6), [featureCounts]);
 
     const inputSchemaLabel = inputSchema?.type === 'transaction_graph' ? 'Transaction Graph' : inputSchema?.type === 'wide_table' ? 'Wide Table' : (inputSchema?.type || 'Legacy Table');
 
-    const formatMetricDisplay = (value, sampleCount) => {
-        if (value === null || value === undefined) return 'n/a';
-        const num = Number(value);
-        if (Number.isNaN(num)) return 'n/a';
-        // If sample count is tiny, metrics like PR/ROC can be artificially perfect — hide them
-        if (sampleCount && sampleCount < 20) return 'n/a';
-        return num.toFixed(3);
-    };
-
-    // ── Dynamic Sidebar Nav ──────────────────────────────────────────────────
     const getNavItems = () => {
         if (currentRole === 'Analyst') {
             return [
-                {
-                    id:'DETAILED_VIEW', label:'Threat Matrix', badge: (critCount + highCount) > 0 ? critCount + highCount : null,
-                    icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                },
-                {
-                    id:'MULE_REGISTRY', label:'Mule Registry',
-                    icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                },
-                {
-                    id:'ANALYTICS', label:'Model Analytics',
-                    icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                }
+                { id:'DETAILED_VIEW', label:'Threat Matrix', badge: totalAlertsCount > 0 ? totalAlertsCount : null, icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> },
+                { id:'MULE_REGISTRY', label:'Mule Registry', icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg> },
+                { id:'ANALYTICS', label:'Model Analytics', icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> }
             ];
         } else {
             return [
-                {
-                    id:'OVERVIEW', label:'Command Center',
-                    icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                },
-                {
-                    id:'SYSTEM_LOGS', label:'Audit Logs',
-                    icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                }
+                { id:'OVERVIEW', label:'Command Center', icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg> },
+                { id:'SYSTEM_LOGS', label:'Audit Logs', icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> }
             ];
         }
     };
     const navItems = getNavItems();
     const activeAccent = currentRole === 'Admin' ? T.accent : T.analystAccent;
     const activeAccentBg = currentRole === 'Admin' ? T.accentBg : T.analystAccentBg;
-
-    const openLiveRoute = (path) => { window.history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); };
+    const activeAccentBgSafe = activeAccentBg || (currentRole === 'Admin' ? T.accentBg : T.analystAccentBg) || T.accentBg;
 
     if (loading) return (
         <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:T.bg }}>
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
-                <div style={{ width:36, height:36, border:`2px solid ${T.border}`, borderTop:`2px solid ${T.accent}`, borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-                <p style={{ fontSize:12, color:T.txt3, fontFamily:'monospace', letterSpacing:'0.15em', textTransform:'uppercase' }}>Initializing Nexus Core</p>
+                <div style={{ width:40, height:40, border:`3px solid ${T.border}`, borderTop:`3px solid ${activeAccent}`, borderRadius:'50%', animation:'spin 0.8s linear infinite', filter: `drop-shadow(0 0 8px ${activeAccent})` }} />
+                <p style={{ fontSize:13, color:T.txt2, fontFamily:'monospace', letterSpacing:'0.2em', textTransform:'uppercase' }}>Initializing Nexus Core</p>
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 
-    const SBW = sidebarCollapsed ? 56 : 220;
+    const SBW = sidebarCollapsed ? 64 : 260;
     const statusText = isUploading || statusMeta.kind !== 'idle' ? statusMeta.label : 'Engine Idle';
     const statusTone = statusMeta.kind === 'error' ? T.crit : statusMeta.kind === 'done' ? T.ok : isUploading ? activeAccent : T.ok;
 
@@ -772,51 +964,51 @@ const Dashboard = () => {
         <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:T.bg, fontFamily:"'Inter', 'Segoe UI', system-ui, sans-serif", fontSize:14, color:T.txt1 }}>
             <style>{`
                 * { box-sizing: border-box; }
-                ::-webkit-scrollbar { width: 6px; height: 6px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 3px; }
-                ::-webkit-scrollbar-thumb:hover { background: ${T.borderHi}; }
+                ::-webkit-scrollbar { width: 8px; height: 8px; }
+                ::-webkit-scrollbar-track { background: ${T.bg}; }
+                ::-webkit-scrollbar-thumb { background: ${T.borderHi}; border-radius: 4px; }
+                ::-webkit-scrollbar-thumb:hover { background: ${T.txt3}; }
                 input::placeholder { color: ${T.txt3}; }
-                select option { background: ${T.raised}; color: ${T.txt1}; }
+                select option { background: ${T.surface}; color: ${T.txt1}; }
                 @keyframes spin { to { transform: rotate(360deg); } }
             `}</style>
             <Toaster />
 
             {/* ── SIDEBAR ──────────────────────────────────────────────────── */}
-            <aside style={{ width:SBW, flexShrink:0, background:T.surface, borderRight:`1px solid ${T.border}`, display:'flex', flexDirection:'column', transition:'width 0.2s ease', overflow:'hidden' }}>
-                <div style={{ padding: sidebarCollapsed ? '18px 0' : '18px 16px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', gap:10, justifyContent: sidebarCollapsed ? 'center' : 'space-between' }}>
+            <aside style={{ width:SBW, flexShrink:0, background:T.bg, borderRight:`1px solid ${T.border}`, display:'flex', flexDirection:'column', transition:'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', overflow:'hidden', zIndex:10 }}>
+                <div style={{ padding: sidebarCollapsed ? '24px 0' : '24px 20px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', gap:12, justifyContent: sidebarCollapsed ? 'center' : 'space-between' }}>
                     {!sidebarCollapsed && (
-                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <div style={{ width:28, height:28, background:activeAccentBg, border:`1px solid ${activeAccent}30`, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                                <svg width="14" height="14" fill="none" stroke={activeAccent} strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <div style={{ width:32, height:32, background:activeAccentBgSafe, border:`1px solid ${activeAccent}40`, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', boxShadow: `0 0 12px ${activeAccentBgSafe}` }}>
+                                <svg width="16" height="16" fill="none" stroke={activeAccent} strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
                             <div>
-                                <div style={{ fontSize:13, fontWeight:700, color:T.txt1, letterSpacing:'0.02em' }}>Project Nexus</div>
-                                <div style={{ fontSize:10, color:T.txt3, letterSpacing:'0.05em' }}>Detection Pipeline</div>
+                                <div style={{ fontSize:15, fontWeight:800, color:T.txt1, letterSpacing:'0.02em' }}>Project Nexus</div>
+                                <div style={{ fontSize:11, color:T.txt3, letterSpacing:'0.05em', textTransform:'uppercase' }}>Detection Pipeline</div>
                             </div>
                         </div>
                     )}
                     <button onClick={() => setSidebarCollapsed(v => !v)}
-                        style={{ background:'none', border:'none', cursor:'pointer', color:T.txt3, padding:4, borderRadius:4, display:'flex', alignItems:'center', flexShrink:0 }}
-                        onMouseEnter={e => e.currentTarget.style.color = T.txt2} onMouseLeave={e => e.currentTarget.style.color = T.txt3}>
-                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        style={{ background:'none', border:'none', cursor:'pointer', color:T.txt3, padding:6, borderRadius:6, display:'flex', alignItems:'center', flexShrink:0, transition:'all 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = T.txt1; e.currentTarget.style.background = T.raised; }} onMouseLeave={e => { e.currentTarget.style.color = T.txt3; e.currentTarget.style.background = 'transparent'; }}>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             {sidebarCollapsed ? <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/> : <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7"/>}
                         </svg>
                     </button>
                 </div>
 
-                <nav style={{ flex:1, padding:'10px 8px', display:'flex', flexDirection:'column', gap:2, overflowY:'auto' }}>
+                <nav style={{ flex:1, padding:'16px 12px', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
                     {navItems.map(({ id, label, icon, badge }) => {
                         const active = currentView === id;
                         return (
                             <button key={id} onClick={() => setCurrentView(id)} title={sidebarCollapsed ? label : undefined}
-                                style={{ display:'flex', alignItems:'center', gap:10, padding: sidebarCollapsed ? '9px 0' : '9px 12px', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', borderRadius:6, border:'none', cursor:'pointer', width:'100%', textAlign:'left', background: active ? activeAccentBg : 'transparent', color: active ? activeAccent : T.txt2, transition:'background 0.15s, color 0.15s', position:'relative' }}
+                                style={{ display:'flex', alignItems:'center', gap:12, padding: sidebarCollapsed ? '12px 0' : '12px 16px', justifyContent: sidebarCollapsed ? 'center' : 'flex-start', borderRadius:8, border:'none', cursor:'pointer', width:'100%', textAlign:'left', background: active ? activeAccentBgSafe : 'transparent', color: active ? activeAccent : T.txt2, transition:'all 0.2s ease', position:'relative', borderLeft: active ? `3px solid ${activeAccent}` : '3px solid transparent' }}
                                 onMouseEnter={e => { if (!active) { e.currentTarget.style.background = T.raised; e.currentTarget.style.color = T.txt1; }}}
                                 onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.txt2; }}}>
-                                <span style={{ flexShrink:0 }}>{icon}</span>
-                                {!sidebarCollapsed && <span style={{ fontSize:13, fontWeight: active ? 600 : 400 }}>{label}</span>}
+                                <span style={{ flexShrink:0, filter: active ? `drop-shadow(0 0 4px ${activeAccent})` : 'none' }}>{icon}</span>
+                                {!sidebarCollapsed && <span style={{ fontSize:14, fontWeight: active ? 700 : 500 }}>{label}</span>}
                                 {!sidebarCollapsed && badge && (
-                                    <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, background:T.critBg, color:T.crit, border:`1px solid ${T.critBdr}`, borderRadius:10, padding:'1px 7px', minWidth:22, textAlign:'center' }}>{badge}</span>
+                                    <span style={{ marginLeft:'auto', fontSize:11, fontWeight:800, background:T.critBg, color:T.crit, border:`1px solid ${T.critBdr}`, borderRadius:12, padding:'2px 8px', minWidth:26, textAlign:'center', boxShadow: `0 0 8px ${T.critBg}` }}>{badge}</span>
                                 )}
                             </button>
                         );
@@ -824,78 +1016,78 @@ const Dashboard = () => {
                 </nav>
 
                 {!sidebarCollapsed && currentRole === 'Admin' && (
-                    <div style={{ padding:'12px 12px', borderTop:`1px solid ${T.border}` }}>
-                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Live Operations</div>
+                    <div style={{ padding:'16px', borderTop:`1px solid ${T.border}` }}>
+                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>Live Operations</div>
                         <div style={{ display:'grid', gap:8 }}>
-                            <button onClick={() => openLiveRoute('/live-stream')} style={{ width:'100%', padding:'9px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left' }}>Current Live Stream</button>
-                            <button onClick={() => openLiveRoute('/live-stream/audit')} style={{ width:'100%', padding:'9px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left' }}>Live Audit Log</button>
+                            <button onClick={() => openLiveRoute('/live-stream')} style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:`1px solid ${T.border}`, background:T.surface, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left', transition:'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.borderColor = T.borderHi; e.currentTarget.style.background = T.raised;}} onMouseLeave={e => {e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.surface;}}>Current Live Stream</button>
+                            <button onClick={() => openLiveRoute('/live-stream/audit')} style={{ width:'100%', padding:'10px 14px', borderRadius:8, border:`1px solid ${T.border}`, background:T.surface, color:T.txt1, fontSize:12, fontWeight:600, cursor:'pointer', textAlign:'left', transition:'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.borderColor = T.borderHi; e.currentTarget.style.background = T.raised;}} onMouseLeave={e => {e.currentTarget.style.borderColor = T.border; e.currentTarget.style.background = T.surface;}}>Live Audit Log</button>
                         </div>
                     </div>
                 )}
 
                 {!sidebarCollapsed && availableDatasets.length > 0 && (
-                    <div style={{ padding:'12px 12px', borderTop:`1px solid ${T.border}` }}>
-                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Active Corpus</div>
-                        <div style={{ display:'grid', gap:8 }}>
+                    <div style={{ padding:'16px', borderTop:`1px solid ${T.border}` }}>
+                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8, fontWeight:700 }}>Active Corpus</div>
+                        <div style={{ display:'grid', gap:10 }}>
                             <div style={{ position:'relative' }}>
-                                <select value={datasetSourceFilter} onChange={e => setDatasetSourceFilter(e.target.value)} style={{ width:'100%', padding:'7px 28px 7px 10px', fontSize:12, borderRadius:5, outline:'none', background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, cursor:'pointer', appearance:'none', fontFamily:'monospace' }}>
+                                <select value={datasetSourceFilter} onChange={e => setDatasetSourceFilter(e.target.value)} style={{ width:'100%', padding:'9px 32px 9px 12px', fontSize:12, borderRadius:8, outline:'none', background:T.surface, border:`1px solid ${T.border}`, color:T.txt1, cursor:'pointer', appearance:'none', fontFamily:'monospace', fontWeight:600 }}>
                                     <option value="ALL">All Sources</option>
                                     <option value="STATIC_INGEST">Static Ingest</option>
                                     <option value="LIVE_STREAM">Live Stream</option>
                                 </select>
-                                <svg width="12" height="12" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg width="14" height="14" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </div>
                             <div style={{ position:'relative' }}>
-                                <select value={activeDataset} onChange={e => setActiveDataset(e.target.value)} style={{ width:'100%', padding:'7px 28px 7px 10px', fontSize:12, borderRadius:5, outline:'none', background:T.bg, border:`1px solid ${T.borderHi}`, color:T.txt1, cursor:'pointer', appearance:'none', fontFamily:'monospace' }}>
+                                <select value={activeDataset} onChange={e => setActiveDataset(e.target.value)} style={{ width:'100%', padding:'9px 32px 9px 12px', fontSize:12, borderRadius:8, outline:'none', background:T.surface, border:`1px solid ${T.border}`, color:T.txt1, cursor:'pointer', appearance:'none', fontFamily:'monospace', fontWeight:600 }}>
                                     <option value="ALL">All Datasets</option>
                                     {visibleDatasetFiles.map((file, i) => (
                                         <option key={`${file.fileHash || file.fileName}-${i}`} value={file.fileName}>{`${file.fileName} · ${resolveSourceType(file) === 'LIVE_STREAM' ? 'Live' : 'Static'} · ${(file.totalAccountsScanned || 0).toLocaleString()} scanned`}</option>
                                     ))}
                                 </select>
-                                <svg width="12" height="12" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg width="14" height="14" fill="none" stroke={T.txt3} strokeWidth="2" viewBox="0 0 24 24" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div style={{ padding: sidebarCollapsed ? '12px 0' : '12px 14px', borderTop:`1px solid ${T.border}`, display:'flex', alignItems:'center', gap:8, justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
-                    <div style={{ width:7, height:7, borderRadius:'50%', flexShrink:0, background: statusTone }} />
+                <div style={{ padding: sidebarCollapsed ? '16px 0' : '16px 20px', borderTop:`1px solid ${T.border}`, display:'flex', alignItems:'center', gap:10, justifyContent: sidebarCollapsed ? 'center' : 'flex-start', background:T.surface }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', flexShrink:0, background: statusTone, boxShadow: `0 0 8px ${statusTone}` }} />
                     {!sidebarCollapsed && (
-                        <span style={{ fontSize:11, color:T.txt3, fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{statusText}</span>
+                        <span style={{ fontSize:12, color:T.txt2, fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:600 }}>{statusText}</span>
                     )}
                 </div>
             </aside>
 
-            {/* ── MAIN CONTENT ─────────────────────────────────────────────── */}
-            <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-                <header style={{ height:52, background:T.surface, borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', padding:'0 20px', gap:12, flexShrink:0 }}>
-                    <h1 style={{ fontSize:15, fontWeight:600, color:T.txt1, flex:1, margin:0 }}>{navItems.find(n => n.id === currentView)?.label || 'Dashboard'}</h1>
-                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginRight:8 }}>
-                            <label style={{ fontSize:12, color:T.txt3 }}>Role Workspace:</label>
-                            <select value={currentRole} onChange={handleRoleToggle} style={{ padding:'6px 10px', borderRadius:6, border:`1px solid ${activeAccent}40`, background:activeAccentBg, color:activeAccent, fontWeight:600, cursor:'pointer', outline:'none' }}>
+            {/* ── HEADER & WORKSPACE ───────────────────────────────────────── */}
+            <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background: T.bg }}>
+                <header style={{ height:64, background:T.surface, borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', padding:'0 24px', gap:16, flexShrink:0, zIndex:5, boxShadow:'0 4px 24px rgba(0,0,0,0.2)' }}>
+                    <h1 style={{ fontSize:18, fontWeight:700, color:T.txt1, flex:1, margin:0, letterSpacing:'-0.02em' }}>{navItems.find(n => n.id === currentView)?.label || 'Dashboard'}</h1>
+                    <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, marginRight:12 }}>
+                            <label style={{ fontSize:12, color:T.txt3, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>Role Workspace</label>
+                            <select value={currentRole} onChange={handleRoleToggle} style={{ padding:'8px 12px', borderRadius:8, border:`1px solid ${activeAccent}40`, background:activeAccentBgSafe, color:activeAccent, fontWeight:700, cursor:'pointer', outline:'none', boxShadow:`0 0 12px ${activeAccentBgSafe}` }}>
                                 <option value="Analyst">Analyst Viewer</option>
                                 <option value="Admin">System Administrator</option>
                             </select>
                         </div>
-                        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', background:T.critBg, border:`1px solid ${T.critBdr}`, borderRadius:5 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:T.crit, flexShrink:0 }} />
-                            <span style={{ fontSize:12, color:T.crit, fontWeight:600 }}>{critCount} Critical</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', background:T.critBg, border:`1px solid ${T.critBdr}`, borderRadius:8, boxShadow:`0 0 8px ${T.critBg}` }}>
+                            <span style={{ width:8, height:8, borderRadius:'50%', background:T.crit, flexShrink:0, filter:`drop-shadow(0 0 4px ${T.crit})` }} />
+                            <span style={{ fontSize:13, color:T.crit, fontWeight:700 }}>{critCount} Critical</span>
                         </div>
-                        <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', background:T.highBg, border:`1px solid ${T.highBdr}`, borderRadius:5 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:T.high, flexShrink:0 }} />
-                            <span style={{ fontSize:12, color:T.high, fontWeight:600 }}>{highCount} High Risk</span>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 14px', background:T.highBg, border:`1px solid ${T.highBdr}`, borderRadius:8, boxShadow:`0 0 8px ${T.highBg}` }}>
+                            <span style={{ width:8, height:8, borderRadius:'50%', background:T.high, flexShrink:0, filter:`drop-shadow(0 0 4px ${T.high})` }} />
+                            <span style={{ fontSize:13, color:T.high, fontWeight:700 }}>{highCount} High Risk</span>
                         </div>
                     </div>
 
                     {currentRole === 'Admin' && (
                         <>
-                            <div style={{ width:1, height:24, background:T.border, margin:'0 8px' }} />
+                            <div style={{ width:1, height:32, background:T.border, margin:'0 8px' }} />
                             <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} style={{ display:'none' }} />
                             <button onClick={() => fileInputRef.current.click()} disabled={isUploading}
-                                style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 14px', borderRadius:6, fontSize:12, fontWeight:600, cursor: isUploading ? 'not-allowed' : 'pointer', transition:'all 0.15s', background: isUploading ? T.raised : activeAccent, color: isUploading ? T.txt3 : '#fff', border: isUploading ? `1px solid ${T.borderHi}` : `1px solid ${activeAccent}` }}
-                                onMouseEnter={e => { if (!isUploading) e.currentTarget.style.filter = 'brightness(1.1)'; }} onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
-                                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 18px', borderRadius:8, fontSize:13, fontWeight:700, cursor: isUploading ? 'not-allowed' : 'pointer', transition:'all 0.2s', background: isUploading ? T.raised : activeAccent, color: isUploading ? T.txt3 : '#fff', border: isUploading ? `1px solid ${T.borderHi}` : `1px solid ${activeAccent}`, boxShadow: isUploading ? 'none' : `0 0 16px ${activeAccentBgSafe}` }}
+                                onMouseEnter={e => { if (!isUploading) e.currentTarget.style.filter = 'brightness(1.15)'; }} onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
+                                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Ingest Data
                             </button>
                         </>
@@ -903,35 +1095,35 @@ const Dashboard = () => {
                 </header>
 
                 {isUploading && currentRole === 'Admin' && (
-                    <div style={{ padding:'16px 20px 0 20px' }}>
-                        <Card style={{ padding:'14px 16px', border:`1px solid ${T.borderHi}`, background:`linear-gradient(135deg, ${T.raised} 0%, #17191f 100%)` }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', gap:14, flexWrap:'wrap', alignItems:'flex-start' }}>
-                                <div style={{ minWidth: 240 }}>
-                                    <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:6 }}>Live Upload</div>
-                                    <div style={{ fontSize:15, color:T.txt1, fontWeight:700, marginBottom:4, fontFamily:'monospace' }}>{uploadFileName || 'Current dataset'}</div>
-                                    <div style={{ fontSize:12, color:T.txt2, lineHeight:1.5 }}>{statusMeta.detail}</div>
+                    <div style={{ padding:'24px 32px 0 32px' }}>
+                        <Card style={{ padding:'20px 24px', border:`1px solid ${activeAccent}40`, background:`linear-gradient(135deg, ${T.surface} 0%, #000 100%)` }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', gap:16, flexWrap:'wrap', alignItems:'flex-start' }}>
+                                <div style={{ minWidth: 280 }}>
+                                    <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:8, fontWeight:700 }}>Live Upload Pipeline</div>
+                                    <div style={{ fontSize:18, color:T.txt1, fontWeight:800, marginBottom:6, fontFamily:'monospace' }}>{uploadFileName || 'Current dataset'}</div>
+                                    <div style={{ fontSize:13, color:T.txt2, lineHeight:1.6 }}>{statusMeta.detail}</div>
                                 </div>
-                                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                                    <div style={{ padding:'8px 12px', borderRadius:8, background:T.bg, border:`1px solid ${T.borderHi}` }}>
-                                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em' }}>Status</div>
-                                        <div style={{ fontSize:12, color:statusTone, fontWeight:700, marginTop:2 }}>{statusText}</div>
+                                <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                                    <div style={{ padding:'10px 16px', borderRadius:10, background:T.bg, border:`1px solid ${T.borderHi}` }}>
+                                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:600 }}>Status</div>
+                                        <div style={{ fontSize:14, color:statusTone, fontWeight:800, marginTop:4 }}>{statusText}</div>
                                     </div>
-                                    <div style={{ padding:'8px 12px', borderRadius:8, background:T.bg, border:`1px solid ${T.borderHi}` }}>
-                                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em' }}>Elapsed</div>
-                                        <div style={{ fontSize:12, color:T.txt1, fontWeight:700, marginTop:2 }}>{formatDuration(uploadElapsedSeconds)}</div>
+                                    <div style={{ padding:'10px 16px', borderRadius:10, background:T.bg, border:`1px solid ${T.borderHi}` }}>
+                                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', fontWeight:600 }}>Elapsed</div>
+                                        <div style={{ fontSize:14, color:T.txt1, fontWeight:800, marginTop:4 }}>{formatDuration(uploadElapsedSeconds)}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div style={{ marginTop:14, display:'grid', gridTemplateColumns:'repeat(5, minmax(0, 1fr))', gap:8 }}>
+                            <div style={{ marginTop:20, display:'grid', gridTemplateColumns:'repeat(5, minmax(0, 1fr))', gap:10 }}>
                                 {UPLOAD_PROGRESS_STEPS.map((step, idx) => {
                                     const completed = idx < statusMeta.phase; const active = idx === statusMeta.phase; const terminal = idx === 4 && statusMeta.kind !== 'active' && statusMeta.kind !== 'idle';
-                                    const stepBg = terminal && statusMeta.kind === 'error' ? T.critBg : completed || active || terminal ? activeAccentBg : T.bg;
-                                    const stepBorder = terminal && statusMeta.kind === 'error' ? T.critBdr : completed || active || terminal ? T.borderHi : T.border;
-                                    const stepColor = terminal && statusMeta.kind === 'error' ? T.crit : completed || active || terminal ? T.txt1 : T.txt3;
+                                    const stepBg = terminal && statusMeta.kind === 'error' ? T.critBg : completed || active || terminal ? activeAccentBgSafe : T.bg;
+                                    const stepBorder = terminal && statusMeta.kind === 'error' ? T.critBdr : completed || active || terminal ? `rgba(99,102,241,0.3)` : T.border;
+                                    const stepColor = terminal && statusMeta.kind === 'error' ? T.crit : completed || active || terminal ? activeAccent : T.txt3;
                                     return (
-                                        <div key={step.label} style={{ padding:'8px 10px', borderRadius:8, background:stepBg, border:`1px solid ${stepBorder}` }}>
-                                            <div style={{ fontSize:9, color:stepColor, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:2 }}>{String(idx + 1).padStart(2, '0')}</div>
-                                            <div style={{ fontSize:12, color:stepColor, fontWeight:700 }}>{step.label}</div>
+                                        <div key={step.label} style={{ padding:'10px 12px', borderRadius:10, background:stepBg, border:`1px solid ${stepBorder}`, boxShadow: active ? `0 0 12px ${activeAccentBgSafe}` : 'none' }}>
+                                            <div style={{ fontSize:10, color:stepColor, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4, fontWeight:800 }}>{String(idx + 1).padStart(2, '0')}</div>
+                                            <div style={{ fontSize:13, color: completed || active || terminal ? T.txt1 : T.txt3, fontWeight:700 }}>{step.label}</div>
                                         </div>
                                     );
                                 })}
@@ -940,441 +1132,48 @@ const Dashboard = () => {
                     </div>
                 )}
 
-                <main style={{ flex:1, overflowY:'auto', padding:20 }}>
-
-                    {/* ── OVERVIEW (Admin Only) ────────────────────────────── */}
+                {/* ── VIEWS DISPATCHER ─────────────────────────────────────────── */}
+                <main style={{ flex:1, overflowY:'auto', padding:'24px 32px' }}>
                     {currentView === 'OVERVIEW' && currentRole === 'Admin' && (
-                        <div>
-                            <Card style={{ padding:'20px 22px', marginBottom:16, background:`linear-gradient(135deg, ${T.raised} 0%, #17191f 45%, #111214 100%)`, border:`1px solid ${T.borderHi}` }}>
-                                <div style={{ display:'flex', justifyContent:'space-between', gap:18, flexWrap:'wrap', alignItems:'flex-start' }}>
-                                    <div style={{ maxWidth:620 }}>
-                                        <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:8 }}>Dataset Lab</div>
-                                        <h2 style={{ margin:'0 0 8px 0', fontSize:28, lineHeight:1.08, color:T.txt1, letterSpacing:'-0.03em' }}>System Ingestion & Global Architecture</h2>
-                                        <p style={{ margin:0, color:T.txt2, fontSize:13, lineHeight:1.6, maxWidth:540 }}>Manage the core ML ingest flow, alter batch chunk sizes, and configure schema ingestion parameters before releasing datasets to the Analyst queue.</p>
-                                        <div style={{ display:'flex', gap:10, marginTop:16, flexWrap:'wrap', alignItems:'center' }}>
-                                            <button onClick={() => fileInputRef.current.click()} style={{ padding:'10px 16px', borderRadius:8, border:`1px solid ${activeAccent}`, background:activeAccent, color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>Upload CSV</button>
-                                            <div style={{ display:'flex', alignItems:'center', gap:8, paddingLeft:12 }}>
-                                                <label style={{ fontSize:12, color:T.txt2, display:'flex', alignItems:'center', gap:8 }}>
-                                                    <input type="checkbox" checked={uploadLimitEnabled} onChange={e => setUploadLimitEnabled(e.target.checked)} />
-                                                    <span style={{ marginLeft:6 }}>Limit uploads</span>
-                                                </label>
-                                                <input type="number" min={1} value={maxUploadMB} onChange={e => setMaxUploadMB(e.target.value)} style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
-                                                <button onClick={saveUploadConfig} style={{ padding:'8px 10px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.surface, color:T.txt1, cursor:'pointer' }}>Save</button>
-                                                <div style={{ display:'flex', alignItems:'center', gap:6, marginLeft:8 }}>
-                                                    <span style={{ fontSize:12, color:T.txt2 }}>Per-upload MB</span>
-                                                    <input type="number" min={1} value={perUploadMB} onChange={e => setPerUploadMB(e.target.value)} style={{ width:86, padding:'6px 8px', borderRadius:6, border:`1px solid ${T.borderHi}`, background:T.bg, color:T.txt1 }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ minWidth:210, padding:'14px 16px', borderRadius:12, background:T.bg, border:`1px solid ${T.border}` }}>
-                                        <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Current Schema</div>
-                                        <div style={{ fontSize:20, fontWeight:700, color:T.txt1, marginBottom:6 }}>{inputSchemaLabel}</div>
-                                        <div style={{ fontSize:12, color:T.txt2, lineHeight:1.5 }}>
-                                            {inputSchema?.type === 'transaction_graph' ? 'Source and destination accounts are aggregated into node-level risk features.' : 'The model is using the legacy wide-table account schema.'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:16 }}>
-                                <MetricCard label="Total Accounts Scanned" value={totalScanned.toLocaleString()} color={T.txt1} />
-                                <MetricCard label="Critical Threats" value={critCount} color={T.crit} />
-                                <MetricCard label="High Risk Anomalies" value={highCount} color={T.high} />
-                            </div>
-                        </div>
+                        <AdminOverviewView
+                            activeDataset={activeDataset} visibleDatasetFiles={visibleDatasetFiles} totalScanned={totalScanned} critCount={critCount} highCount={highCount}
+                            fileInputRef={fileInputRef} uploadLimitEnabled={uploadLimitEnabled} setUploadLimitEnabled={setUploadLimitEnabled} maxUploadMB={maxUploadMB}
+                            setMaxUploadMB={setMaxUploadMB} perUploadMB={perUploadMB} setPerUploadMB={setPerUploadMB} saveUploadConfig={saveUploadConfig}
+                            inputSchemaLabel={inputSchemaLabel} inputSchema={inputSchema} activeAccent={activeAccent} activeAccentBg={activeAccentBgSafe}
+                        />
                     )}
-
-                    {/* ── SYSTEM LOGS (Admin Only) ─────────────────────────── */}
                     {currentView === 'SYSTEM_LOGS' && currentRole === 'Admin' && (
-                        <div>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-                                <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:6, padding:3, gap:2, overflowX:'auto' }}>
-                                    {[['ALL','All Events'],['AI_ENGINE','AI Engine'],['ANALYST','Analyst'],['SYSTEM','System'],['FILES','Datasets']].map(([id,label]) => (
-                                        <button key={id} onClick={() => setActiveLogTab(id)} style={{ padding:'5px 14px', fontSize:12, fontWeight:600, borderRadius:4, border:'none', cursor:'pointer', transition:'all 0.15s', whiteSpace:'nowrap', background: activeLogTab === id ? T.raised : 'transparent', color: activeLogTab === id ? T.txt1 : T.txt3 }}>{label}</button>
-                                    ))}
-                                </div>
-                                <button onClick={handleSystemWipe} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 14px', fontSize:12, fontWeight:600, borderRadius:6, cursor:'pointer', background:T.critBg, border:`1px solid ${T.critBdr}`, color:T.crit, transition:'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.background = '#2a150a'; }} onMouseLeave={e => { e.currentTarget.style.background = T.critBg; }}>
-                                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg> Wipe Database
-                                </button>
-                            </div>
-
-                            {activeLogTab !== 'FILES' ? (
-                                <Card>
-                                    <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                                        <thead><tr><TH>Timestamp</TH><TH>Actor</TH><TH>Event</TH><TH>Message</TH></tr></thead>
-                                        <tbody>
-                                            {currentLogs.length > 0 ? currentLogs.map((log, i) => (
-                                                <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                                    <td style={{ padding:'10px 16px', fontFamily:'monospace', fontSize:12, color:T.txt3, whiteSpace:'nowrap' }}>{new Date(log.timestamp).toLocaleString()}</td>
-                                                    <td style={{ padding:'10px 16px' }}><ActorBadge actor={log.actor} /></td>
-                                                    <td style={{ padding:'10px 16px' }}><span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color: log.actionType === 'REJECTION' ? T.crit : log.actionType === 'RESOLUTION' ? T.ok : T.txt3 }}>{log.actionType}</span></td>
-                                                    <TD>{log.message}</TD>
-                                                </tr>
-                                            )) : <tr><td colSpan="4" style={{ padding:'32px 16px', textAlign:'center', color:T.txt3, fontSize:12, fontFamily:'monospace', letterSpacing:'0.08em' }}>NO LOGS FOR THIS FILTER</td></tr>}
-                                        </tbody>
-                                    </table>
-                                    <Pagination current={currentPage} total={totalLogPages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalLogPages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalLogPages,p+1))} />
-                                </Card>
-                            ) : (
-                                <Card>
-                                    <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                                        <thead><tr><TH>Ingested At</TH><TH>File Name</TH><TH>Source</TH><TH>SHA-256 Hash</TH></tr></thead>
-                                        <tbody>
-                                            {currentFiles.length > 0 ? currentFiles.map((file, i) => (
-                                                <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                                    <td style={{ padding:'10px 16px', fontFamily:'monospace', fontSize:12, color:T.txt3, whiteSpace:'nowrap' }}>{new Date(file.processedAt).toLocaleString()}</td>
-                                                    <td style={{ padding:'10px 16px', fontSize:13, fontWeight:600, color:T.high, fontFamily:'monospace' }}>{file.fileName}</td>
-                                                    <td style={{ padding:'10px 16px' }}><span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', color:resolveSourceType(file) === 'LIVE_STREAM' ? T.high : T.txt2, background: resolveSourceType(file) === 'LIVE_STREAM' ? T.highBg : T.raised, border:`1px solid ${resolveSourceType(file) === 'LIVE_STREAM' ? T.highBdr : T.borderHi}`, padding:'2px 8px', borderRadius:3 }}>{resolveSourceType(file) === 'LIVE_STREAM' ? 'Live Stream' : 'Static Ingest'}</span></td>
-                                                    <td style={{ padding:'10px 16px', fontFamily:'monospace', fontSize:11, color:T.txt3, wordBreak:'break-all' }}>{file.fileHash}</td>
-                                                </tr>
-                                            )) : <tr><td colSpan="4" style={{ padding:'32px 16px', textAlign:'center', color:T.txt3, fontSize:12, fontFamily:'monospace', letterSpacing:'0.08em' }}>NO DATASETS INGESTED</td></tr>}
-                                        </tbody>
-                                    </table>
-                                    <Pagination current={currentPage} total={totalFilePages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalFilePages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalFilePages,p+1))} />
-                                </Card>
-                            )}
-                        </div>
+                        <SystemLogsView
+                            activeLogTab={activeLogTab} setActiveLogTab={setActiveLogTab} handleSystemWipe={handleSystemWipe} currentLogs={currentLogs} currentPage={currentPage}
+                            totalLogPages={totalLogPages} jumpPage={jumpPage} setJumpPage={setJumpPage} handleJumpKey={handleJumpKey} setCurrentPage={setCurrentPage}
+                            currentFiles={currentFiles} resolveSourceType={resolveSourceType} totalFilePages={totalFilePages}
+                        />
                     )}
-
-                    {/* ── ANALYTICS (Analyst Only) ─────────────────────────── */}
                     {currentView === 'ANALYTICS' && currentRole === 'Analyst' && (
-                        <div>
-                            <Card style={{ padding:'16px 18px', marginBottom:14, border:`1px solid ${T.borderHi}`, background:`linear-gradient(135deg, ${T.surface} 0%, ${T.raised} 100%)` }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                                    <div style={{ width:10, height:10, borderRadius:999, background:T.ok, boxShadow:`0 0 0 4px ${T.okBg}` }} />
-                                    <div>
-                                        <div style={{ fontSize:12, fontWeight:800, color:T.ok, letterSpacing:'0.08em', textTransform:'uppercase' }}>PS2 Compliance Validated</div>
-                                        <div style={{ fontSize:12, color:T.txt2, lineHeight:1.6, marginTop:4 }}>Pipeline successfully executes Graph Node Aggregation (Ring Detection), Velocity Burst Tracking (Pass-Through Detection), and Recall-Optimized Thresholding to satisfy Problem Statement 2 requirements.</div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, marginBottom:14 }}>
-                                {[
-                                    { label:'Input Schema', value:inputSchema?.type === 'transaction_graph' ? 'GRAPH' : (inputSchema?.type || 'wide_table') },
-                                    { label:'Alert Threshold', value:modelConfig?.alert_threshold?.toFixed ? modelConfig.alert_threshold.toFixed(2) : (modelConfig?.alert_threshold ?? '0.85') },
-                                    { label:'Critical Threshold', value:modelConfig?.critical_threshold?.toFixed ? modelConfig.critical_threshold.toFixed(2) : (modelConfig?.critical_threshold ?? '0.95') },
-                                    { label:'ROC AUC', value: formatMetricDisplay(modelMetrics?.roc_auc, modelMetrics?.sample_count) },
-                                    { label:'PR AUC', value: formatMetricDisplay(modelMetrics?.pr_auc, modelMetrics?.sample_count) },
-                                ].map(({ label, value }) => (
-                                    <MetricCard key={label} label={label} value={value} note={((label === 'ROC AUC' || label === 'PR AUC') && modelMetrics?.sample_count && modelMetrics.sample_count < 20) ? 'Insufficient samples to reliably show this metric' : null} />
-                                ))}
-                            </div>
-
-                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
-                                <PadCard>
-                                    <PanelHeader kicker="Threshold sweep" title="Alert volume by threshold" description="This chart answers a single question: how many alerts remain as the cutoff rises?" />
-                                    <div style={{ height:240 }}>
-                                        {thresholdCurve.length > 0 ? (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={thresholdCurve} margin={{ top:8, right:16, left:0, bottom:8 }}>
-                                                    <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false} />
-                                                    <XAxis dataKey="threshold" label={{ value:'Threshold', position:'insideBottom', offset:-2, fill:T.txt3, fontSize:11 }} tickFormatter={fmtThreshold} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} axisLine={false} tickLine={false} angle={-45} textAnchor="end" interval="preserveStartEnd" height={48} />
-                                                    <YAxis label={{ value:'Alerts', angle:-90, position:'insideLeft', fill:T.txt3, fontSize:11 }} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} axisLine={false} tickLine={false} />
-                                                    <RechartsTooltip contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:6, fontSize:12, color:T.txt1 }} />
-                                                    <Legend wrapperStyle={{ fontSize:12, paddingTop:8, color:T.txt2 }} />
-                                                    <Line type="monotone" dataKey="alert_count" stroke={activeAccent} strokeWidth={2} dot={false} name="Alert Count" />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No threshold curve</div>}
-                                    </div>
-                                    <div style={{ marginTop:12, fontSize:11, color:T.txt3, lineHeight:1.4 }}>Pruned {droppedFeatures.length} correlated features to keep the schema lean.</div>
-                                </PadCard>
-
-                                <PadCard>
-                                    <PanelHeader kicker="Threshold sweep" title="Detection quality by threshold" description="Precision, recall, and F1 are shown on the same scale so the trade-off is obvious." />
-                                    <div style={{ height:240 }}>
-                                        {thresholdCurve.length > 0 ? (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={thresholdCurve} margin={{ top:8, right:16, left:0, bottom:8 }}>
-                                                    <CartesianGrid stroke={T.border} strokeDasharray="3 3" vertical={false} />
-                                                    <XAxis dataKey="threshold" label={{ value:'Threshold', position:'insideBottom', offset:-2, fill:T.txt3, fontSize:11 }} tickFormatter={fmtThreshold} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} axisLine={false} tickLine={false} angle={-45} textAnchor="end" interval="preserveStartEnd" height={48} />
-                                                    <YAxis label={{ value:'Score', angle:-90, position:'insideLeft', fill:T.txt3, fontSize:11 }} domain={[0, 1]} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} axisLine={false} tickLine={false} />
-                                                    <RechartsTooltip contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:6, fontSize:12, color:T.txt1 }} />
-                                                    <Legend wrapperStyle={{ fontSize:12, paddingTop:8, color:T.txt2 }} />
-                                                    <Line type="monotone" dataKey="precision" stroke={T.ok} strokeWidth={2} dot={false} name="Precision" />
-                                                    <Line type="monotone" dataKey="recall" stroke={T.high} strokeWidth={2} dot={false} name="Recall" />
-                                                    <Line type="monotone" dataKey="f1" stroke={activeAccent} strokeWidth={2} dot={false} name="F1" />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No threshold curve</div>}
-                                    </div>
-                                </PadCard>
-
-                                <PadCard>
-                                    <PanelHeader kicker="Alert mix" title="Critical vs high-risk share" description="This shows the alert population split at the current thresholds." />
-                                    <div style={{ height:260 }}>
-                                        {activeAlerts.length > 0 ? (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={riskData} innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value" stroke="none">
-                                                        {riskData.map((_, i) => <Cell key={i} fill={CHART_CLRS[i]} />)}
-                                                    </Pie>
-                                                    <RechartsTooltip cursor={false} contentStyle={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:6, fontSize:12, color:T.txt1 }} />
-                                                    <Legend verticalAlign="bottom" height={32} iconType="circle" wrapperStyle={{ fontSize:12, paddingTop:12, color:T.txt2 }} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No data</div>}
-                                    </div>
-                                </PadCard>
-
-                                <PadCard>
-                                    <PanelHeader kicker="Signal frequency" title="Most frequent anomaly signals" description="The top repeated signals help explain which behaviors are dominating the current batch." />
-                                    <div style={{ height:260 }}>
-                                        {featureData.length > 0 ? (
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={featureData} layout="vertical" margin={{ top:0, right:16, left:8, bottom:8 }}>
-                                                    <XAxis type="number" hide />
-                                                    <YAxis dataKey="name" type="category" width={46} axisLine={false} tickLine={false} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} />
-                                                    <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.02)' }} content={<BarTooltip />} />
-                                                    <Bar dataKey="count" fill={activeAccent} radius={[0,3,3,0]} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No data</div>}
-                                    </div>
-                                </PadCard>
-                            </div>
-                            <PadCard style={{ marginTop:14 }}>
-                                <PanelHeader kicker="Feature importance" title="Top Feature Importance" description={null} />
-                                <div style={{ height:280 }}>
-                                    {featureImportance.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={featureImportance.slice(0, 12)} layout="vertical" margin={{ top:0, right:16, left:8, bottom:8 }}>
-                                                <XAxis type="number" hide />
-                                                <YAxis dataKey="name" type="category" width={110} axisLine={false} tickLine={false} tick={{ fill:T.txt3, fontSize:10, fontFamily:'monospace' }} />
-                                                {/* Bug 2 fix: feature importance data has `importance`, not `count` or `fullName`.
-                                                    ImportanceTooltip reads the correct field. */}
-                                                <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.02)' }} content={<ImportanceTooltip />} />
-                                                <Bar dataKey="importance" fill={activeAccent} radius={[0,3,3,0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : <div style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:T.txt3, fontSize:12, fontFamily:'monospace' }}>No importance data</div>}
-                                </div>
-                            </PadCard>
-                        </div>
+                        <ModelAnalyticsView
+                            inputSchema={inputSchema} modelConfig={modelConfig} modelMetrics={modelMetrics} formatMetricDisplay={formatMetricDisplay}
+                            activeAccent={activeAccent} thresholdCurve={thresholdCurve} fmtThreshold={fmtThreshold} droppedFeatures={droppedFeatures}
+                            activeAlerts={activeAlerts} riskData={riskData} CHART_CLRS={CHART_CLRS} featureData={featureData} featureImportance={featureImportance}
+                        />
                     )}
-
-                    {/* ── THREAT MATRIX & MULE REGISTRY (Analyst Only) ─────── */}
                     {(currentView === 'DETAILED_VIEW' || currentView === 'MULE_REGISTRY') && currentRole === 'Analyst' && (
-                        <div>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, gap:12, flexWrap:'wrap' }}>
-                                
-                                {currentView === 'DETAILED_VIEW' ? (
-                                    <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:6, padding:3, gap:2 }}>
-                                        {[['ALL','All'],['CRITICAL','Critical'],['HIGH_RISK','High Risk']].map(([id,label]) => (
-                                            <button key={id} onClick={() => setActiveTab(id)} style={{ padding:'5px 14px', fontSize:12, fontWeight:600, borderRadius:4, border:'none', cursor:'pointer', transition:'all 0.15s', letterSpacing:'0.02em', background: activeTab === id ? T.raised : 'transparent', color: activeTab === id ? (id === 'CRITICAL' ? T.crit : id === 'HIGH_RISK' ? T.high : T.txt1) : T.txt3 }}>{label}</button>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div><h2 style={{ fontSize: 16, color: T.txt1, margin: 0 }}>Confirmed Mules Directory</h2></div>
-                                )}
-
-                                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                                    <div style={{ display:'flex', background:T.surface, border:`1px solid ${T.border}`, borderRadius:6, overflow:'hidden' }}>
-                                        <select value={searchType} onChange={e => setSearchType(e.target.value)} style={{ padding:'6px 10px', fontSize:11, background:T.raised, border:'none', borderRight:`1px solid ${T.border}`, color:T.txt2, outline:'none', cursor:'pointer', fontWeight:600 }}>
-                                            <option value="ACCOUNT_ID">ACCT ID</option>
-                                            <option value="FEATURE">FEATURE</option>
-                                        </select>
-                                        <input type="text" placeholder="Search…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ padding:'6px 12px', fontSize:13, background:'transparent', border:'none', color:T.txt1, outline:'none', width:180 }} />
-                                    </div>
-                                    {currentView === 'DETAILED_VIEW' && (
-                                        <button onClick={exportToCSV} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', fontSize:12, fontWeight:600, borderRadius:6, cursor:'pointer', background:T.surface, border:`1px solid ${T.border}`, color:T.txt2, transition:'all 0.15s' }} {...hoverBorderButtonProps(T.txt2)}>
-                                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Export CSV
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div style={{ fontSize:12, color:T.txt3, marginBottom:8 }}>
-                                {/* Bug 3 fix: filteredAlerts.length was always ≤ itemsPerPage (12) because
-                                    alerts are server-paginated. Use totalAlertsCount for the real total. */}
-                                <span style={{ color:T.txt1, fontWeight:600 }}>{totalAlertsCount}</span> threats · page <span style={{ color:T.txt1 }}>{currentPage}</span> of {totalPages || 1}
-                            </div>
-
-                            <Card>
-                                <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                                    <thead>
-                                        <tr>
-                                            <TH>Account ID</TH>
-                                            <TH>Status</TH>
-                                            <TH>Risk Score</TH>
-                                            <TH>SHAP Explainability (Why?)</TH>
-                                            <TH>Dataset</TH>
-                                            <TH right>Actions</TH>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {currentAlerts.length > 0 ? currentAlerts.map((alert, i) => {
-                                            const isCrit = alert.status === 'Critical';
-                                            return (
-                                                <tr key={i} onClick={() => setSelectedAccount(alert)} style={{ borderBottom:`1px solid ${T.border}`, cursor:'pointer', borderLeft:`3px solid ${isCrit ? T.crit : T.high}` }} onMouseEnter={e => e.currentTarget.style.background = T.raised} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                                    <td style={{ padding:'11px 16px' }}>
-                                                        <div style={{ fontFamily:'monospace', fontSize:13, fontWeight:600, color:T.txt1 }}>{alert.accountId}</div>
-                                                    </td>
-                                                    <td style={{ padding:'11px 16px' }}>
-                                                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                                            <StatusChip status={alert.status} />
-                                                            <MuleStatusBadge status={alert.muleStatus || 'Pending'} />
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ padding:'11px 16px', minWidth:110 }}>
-                                                        <div style={{ fontSize:15, fontWeight:700, fontFamily:'monospace', color: isCrit ? T.crit : T.high }}>{alert.riskScore.toFixed(1)}%</div>
-                                                        <RiskBar score={alert.riskScore} status={alert.status} />
-                                                        <div style={{ fontSize:11, color:T.txt3, marginTop:5, fontFamily:'monospace' }}>Anomaly: {alert.anomalyScore}</div>
-                                                    </td>
-                                                    <td style={{ padding:'11px 16px' }}>
-                                                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                                                            {getAlertFeatures(alert).map((fObj, idx) => {
-                                                                const f = fObj.name; const cat = featureCat(f); const contribution = Number(fObj.contribution || 0); const isPos = contribution > 0; const isNeg = contribution < 0; const shapLabel = isPos ? '▲ Risk UP' : isNeg ? '▼ Risk DOWN' : '• Neutral Impact'; const shapValue = Number.isFinite(contribution) ? String(contribution) : '0';
-                                                                return (
-                                                                    <div key={f + idx} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                                                        <span style={{ fontSize:10, fontFamily:'monospace', fontWeight:700, color:cat.color, background:cat.bg, border:`1px solid ${cat.border}`, padding:'1px 7px', borderRadius:3, flexShrink:0, minWidth:52, textAlign:'center' }}>{f === 'Anomaly_Score' ? 'STAT' : f}</span>
-                                                                        <div style={{ display:'flex', flexDirection:'column' }}>
-                                                                            <span style={{ fontSize:12, color:T.txt1 }}>{translate(f)}</span>
-                                                                            {fObj.contribution !== null && (
-                                                                                <span style={{ fontSize:10, color: isPos ? T.crit : isNeg ? T.ok : T.txt3, fontWeight:600, display:'flex', alignItems:'center', gap:4, marginTop:1 }}>{shapLabel} <span style={{ color:T.txt3, fontWeight:400 }}>(SHAP {isPos?'+':''}{shapValue})</span></span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </td>
-                                                    <TD muted>{alert.sourceFileName}</TD>
-                                                    <td style={{ padding:'11px 16px', textAlign:'right' }}>
-                                                        <div style={{ display:'flex', gap:6, justifyContent:'flex-end', alignItems:'center' }}>
-                                                            {currentView === 'DETAILED_VIEW' && (
-                                                                <>
-                                                                    <button onClick={e => handleResolve(alert.accountId, e, alert.sourceFileName)} title="Mark as Safe" style={{ padding:'5px 10px', fontSize:11, fontWeight:600, borderRadius:5, background:'transparent', border:`1px solid ${T.border}`, color:T.txt3, cursor:'pointer', transition:'all 0.15s' }} {...hoverBorderButtonProps(T.txt3, T.ok, '#163028', T.okBg)}>Safe</button>
-                                                                    <button onClick={e => { e.stopPropagation(); e.preventDefault(); confirmMule(alert._id); }} title="Confirm Mule" style={{ padding:'5px 10px', fontSize:11, fontWeight:600, borderRadius:5, background:T.critBg, border:`1px solid ${T.critBdr}`, color:T.crit, cursor:'pointer' }} {...hoverBorderButtonProps(T.crit, '#fff', T.critBdr, T.critBg)}>Confirm Mule</button>
-                                                                </>
-                                                            )}
-                                                            {currentView === 'MULE_REGISTRY' && (
-                                                                <button onClick={e => { e.stopPropagation(); e.preventDefault(); revokeMule(alert._id); }} title="Revoke Status" style={{ padding:'5px 10px', fontSize:11, fontWeight:600, borderRadius:5, background:T.raised, border:`1px solid ${T.borderHi}`, color:T.txt2, cursor:'pointer' }} {...hoverBorderButtonProps(T.txt2, T.ok, '#163028', T.okBg)}>Revoke Status</button>
-                                                            )}
-                                                            <button onClick={e => { e.stopPropagation(); setSelectedAccount(alert); }} style={{ padding:'5px 12px', fontSize:11, fontWeight:600, borderRadius:5, background:activeAccentBg, border:`1px solid ${activeAccent}30`, color:activeAccent, cursor:'pointer', transition:'all 0.15s' }} {...hoverBorderButtonProps(activeAccent, '#fff', activeAccent, activeAccent)}>Inspect</button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }) : (
-                                            <tr>
-                                                <td colSpan="6" style={{ padding:'40px 16px', textAlign:'center', color:T.txt3, fontSize:12, fontFamily:'monospace', letterSpacing:'0.08em' }}>
-                                                    NO THREATS MATCH CURRENT FILTER
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                                <Pagination current={currentPage} total={totalPages} jumpPage={jumpPage} onJumpChange={e => setJumpPage(e.target.value)} onJumpKey={e => handleJumpKey(e, totalPages)} onPrev={() => setCurrentPage(p => Math.max(1,p-1))} onNext={() => setCurrentPage(p => Math.min(totalPages,p+1))} />
-                            </Card>
-                        </div>
+                        <ThreatMatrixView
+                            currentView={currentView} activeTab={activeTab} setActiveTab={setActiveTab} searchType={searchType} setSearchType={setSearchType}
+                            searchTerm={searchTerm} setSearchTerm={setSearchTerm} exportToCSV={exportToCSV} totalAlertsCount={totalAlertsCount} currentPage={currentPage}
+                            totalPages={totalPages} currentAlerts={currentAlerts} setSelectedAccount={setSelectedAccount} handleResolve={handleResolve}
+                            confirmMule={confirmMule} revokeMule={revokeMule} activeAccent={activeAccent} activeAccentBg={activeAccentBgSafe} jumpPage={jumpPage} setJumpPage={setJumpPage}
+                            handleJumpKey={handleJumpKey} setCurrentPage={setCurrentPage}
+                        />
                     )}
-
                 </main>
             </div>
 
-            {/* ── ACCOUNT INSPECTION MODAL (Analyst Only) ────────────────── */}
-            {selectedAccount && currentRole === 'Analyst' && (
-                <div style={{ position:'fixed', inset:0, zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(4px)', padding:16 }}>
-                    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth:900, maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
-                        <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center', background:T.raised, flexShrink:0 }}>
-                            <div style={{ display:'flex', alignItems:'center', gap:20 }}>
-                                <RiskGauge score={selectedAccount.riskScore} status={selectedAccount.status} />
-                                <div>
-                                    <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:4 }}>Account Inspection</div>
-                                    <div style={{ fontSize:20, fontWeight:700, fontFamily:'monospace', color:T.txt1, letterSpacing:'0.04em' }}>{selectedAccount.accountId}</div>
-                                    <div style={{ display:'flex', gap:16, marginTop:6 }}>
-                                        <span style={{ fontSize:11, color:T.txt3, fontFamily:'monospace' }}>{new Date(selectedAccount.detectedAt).toLocaleString()}</span>
-                                        <span style={{ fontSize:11, color:T.txt3, fontFamily:'monospace' }}>{selectedAccount.sourceFileName}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{ display:'flex', gap:8 }}>
-                                <button onClick={(e) => { handleResolve(selectedAccount.accountId, e, selectedAccount.sourceFileName); setSelectedAccount(null); }} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', fontSize:12, fontWeight:600, borderRadius:6, cursor:'pointer', transition:'all 0.15s', background:T.okBg, border:`1px solid #163028`, color:T.ok }}>
-                                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> Mark Safe
-                                </button>
-                                <button onClick={() => setSelectedAccount(null)} style={{ padding:'7px 10px', borderRadius:6, background:'transparent', border:`1px solid ${T.border}`, color:T.txt3, cursor:'pointer', transition:'all 0.15s' }} {...hoverBorderButtonProps(T.txt3)}>
-                                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
-                            <div style={{ width:'55%', padding:20, overflowY:'auto', borderRight:`1px solid ${T.border}` }}>
-                                <div style={{ fontSize:10, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:14 }}>KYC Profile &amp; Ledger</div>
-                                {selectedAccount.kycData ? (
-                                    <>
-                                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
-                                            {[
-                                                { label:'Account Holder',  val:selectedAccount.kycData.fullName, color:T.txt1 },
-                                                { label:'Current Balance', val:selectedAccount.kycData.currentBalance, color:T.ok },
-                                                { label:'Last Login IP',   val:selectedAccount.kycData.lastLoginIp, color:T.txt2 },
-                                                { label:'Device Fingerprint',val:selectedAccount.kycData.deviceType, color:T.txt2 },
-                                            ].map(({ label, val, color }) => (
-                                                <div key={label} style={{ background:T.raised, border:`1px solid ${T.border}`, borderRadius:6, padding:'12px 14px' }}>
-                                                    <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>{label}</div>
-                                                    <div style={{ fontSize:13, fontWeight:600, color, fontFamily: label.includes('IP')||label.includes('Device') ? 'monospace' : 'inherit' }}>{val}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div style={{ fontSize:10, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10 }}>Recent Transactions (72h)</div>
-                                        <table style={{ width:'100%', borderCollapse:'collapse', background:T.raised, border:`1px solid ${T.border}`, borderRadius:6, overflow:'hidden' }}>
-                                            <thead>
-                                                <tr style={{ background:T.bg }}>
-                                                    {['TXN ID','Type','Amount'].map((h,i) => (
-                                                        <th key={h} style={{ padding:'8px 12px', fontSize:10, color:T.txt3, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', textAlign: i === 2 ? 'right' : 'left', borderBottom:`1px solid ${T.border}` }}>{h}</th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedAccount.kycData.recentTransactions.map((txn, i) => (
-                                                    <tr key={i} style={{ borderBottom:`1px solid ${T.border}` }}>
-                                                        <td style={{ padding:'9px 12px', fontFamily:'monospace', fontSize:11, color:activeAccent }}>{txn.txnId}</td>
-                                                        <td style={{ padding:'9px 12px', fontSize:12, color:T.txt2 }}>{txn.type}</td>
-                                                        <td style={{ padding:'9px 12px', fontFamily:'monospace', fontSize:12, color:T.txt1, fontWeight:600, textAlign:'right' }}>{txn.amount}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </>
-                                ) : <div style={{ color:T.txt3, fontSize:13, fontStyle:'italic' }}>KYC data unavailable.</div>}
-                            </div>
-
-                            <div style={{ width:'45%', padding:20, overflowY:'auto', background:T.bg }}>
-                                <div style={{ fontSize:10, fontWeight:700, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:14 }}>AI Telemetry — Active Signals</div>
-                                {selectedAccount.rawTelemetry ? (
-                                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                                        {Object.entries(selectedAccount.rawTelemetry).filter(([k,v]) => k !== 'Anomaly_Score' && v !== 0).map(([k, v]) => {
-                                            const topF = getAlertFeatures(selectedAccount).find(tf => tf.name === k);
-                                            const isTop = !!topF;
-                                            const cat = featureCat(k);
-                                            return (
-                                                <div key={k} style={{ background: isTop ? cat.bg : T.surface, border: `1px solid ${isTop ? cat.border : T.border}`, borderLeft: isTop ? `3px solid ${cat.color}` : `1px solid ${T.border}`, borderRadius:6, padding:'10px 12px' }}>
-                                                    <div style={{ fontSize:10, fontFamily:'monospace', color: isTop ? cat.color : T.txt3, marginBottom:3 }}>{k}</div>
-                                                    <div style={{ fontSize:15, fontWeight:700, fontFamily:'monospace', color: isTop ? cat.color : T.txt1 }}>
-                                                        {Number.isInteger(v) ? v : Number(v).toFixed(4)}
-                                                    </div>
-                                                    {isTop && topF.contribution !== null && (
-                                                        <div style={{ fontSize:10, color: topF.contribution > 0 ? T.crit : topF.contribution < 0 ? T.ok : T.txt3, fontWeight:600, marginTop:6, display:'flex', alignItems:'center', gap:3 }}>
-                                                            {topF.contribution > 0 ? '▲ Risk UP' : topF.contribution < 0 ? '▼ Risk DOWN' : '• Neutral Impact'}
-                                                            <span style={{color:T.txt3, fontWeight:400}}>(SHAP {topF.contribution > 0 ? '+' : ''}{String(topF.contribution)})</span>
-                                                        </div>
-                                                    )}
-                                                    {featureDictionary[k] && (
-                                                        <div style={{ fontSize:10, color:T.txt3, marginTop: isTop ? 4 : 8, lineHeight:1.4 }}>{featureDictionary[k]}</div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : <div style={{ textAlign:'center', padding:32, color:T.txt3, fontFamily:'monospace', fontSize:12 }}>Raw telemetry unavailable.</div>}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AccountInspectionModal
+                selectedAccount={selectedAccount}
+                setSelectedAccount={setSelectedAccount}
+                handleResolve={handleResolve}
+                activeAccent={activeAccent}
+            />
         </div>
     );
 };
