@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
@@ -10,7 +10,31 @@ import MuleStatusBadge from '../components/MuleStatusBadge.jsx';
 // 1. THEME & CONSTANTS
 // ============================================================================
 
-import T from '../lib/theme';
+const T = {
+    bg: '#09090b',          // True Obsidian Black
+    surface: '#121214',     // Dark flat slate panel
+    raised: '#1a1a1e',      // Subtle row hover (No glow)
+    border: '#232327',      // Stark, precise 1px borders
+    borderHi: '#38383e',    // Prominent structural borders
+    txt1: '#f4f4f5',        // High contrast white
+    txt2: '#9a9a12',        // Muted gray typography
+    txt3: '#52525b',        // Dark label guide
+    accent: '#3f8cff',      // Flat technical blue accent
+    crit: '#e5484d',        // Solid operational red (No glow)
+    high: '#f7ce46',        // Solid alert amber
+    ok: '#30a46c',          // Clean status emerald
+    
+    // Fallback backgrounds for chips so they don't break
+    accentBg: 'rgba(63, 140, 255, 0.1)',
+    analystAccent: '#14b8a6', 
+    analystAccentBg: 'rgba(20, 184, 166, 0.1)',
+    critBg: 'rgba(229, 72, 77, 0.1)',
+    critBdr: 'rgba(229, 72, 77, 0.3)',
+    highBg: 'rgba(247, 206, 70, 0.1)',
+    highBdr: 'rgba(247, 206, 70, 0.3)',
+    okBg: 'rgba(48, 164, 108, 0.1)',
+};
+
 import {
     RiskGauge, RiskBar, StatusChip, ActorBadge, Card, PadCard, MetricCard, PanelHeader,
     Pagination, ConfusionMatrix, ThresholdSlider, AlertAge, BarTooltip, ImportanceTooltip,
@@ -111,6 +135,11 @@ const alertAgeMs   = (detectedAt) => Date.now() - new Date(detectedAt || 0).getT
 const formatAge    = (ms) => { const h = Math.floor(ms / 3600000); if (h < 24) return `${h}h ${Math.floor((ms % 3600000) / 60000)}m`; return `${Math.floor(h/24)}d ${h%24}h`; };
 const ageColor     = (ms) => { const h = ms/3600000; if (h > 72) return T.crit; if (h > 24) return T.high; return T.ok; };
 
+const formatMetricDisplay = (value, sampleCount) => {
+    if (value === null || value === undefined) return '—';
+    if (sampleCount !== undefined && sampleCount < 20) return 'N/A';
+    return Number(value).toFixed(3);
+};
 
 
 // ============================================================================
@@ -329,7 +358,7 @@ const ModelAnalyticsView = ({
                         <BarChart data={featureImportance.slice(0, 12)} layout="vertical" margin={{ top:0, right:16, left:8, bottom:8 }}>
                             <XAxis type="number" hide />
                             <YAxis dataKey="name" type="category" width={140} axisLine={false} tickLine={false} tick={{ fill:T.txt3, fontSize:11, fontFamily:'monospace', fontWeight:600 }} />
-                            <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.04)' }} content={<BarTooltip />} />
+                            <RechartsTooltip cursor={{ fill:'rgba(255,255,255,0.04)' }} content={<ImportanceTooltip />} />
                             <Bar dataKey="importance" fill={activeAccent} radius={[0,4,4,0]} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -608,6 +637,14 @@ const Dashboard = () => {
     const fileInputRef   = useRef(null);
     const statusInterval = useRef(null);
     const socketRefLocal = useRef(null);
+    
+    const socketStateRef = useRef({ currentPage, activeDataset, activeTab, searchTerm, currentView });
+    useEffect(() => {
+        socketStateRef.current = { currentPage, activeDataset, activeTab, searchTerm, currentView };
+    });
+    const fetchAlertsRef = useRef(fetchAlerts);
+    fetchAlertsRef.current = fetchAlerts;
+
 
     // ── Handlers & Side Effects ─────────────────────────────────────────────
     const statusMeta = getUploadStatusMeta(engineStatus);
@@ -727,7 +764,14 @@ const Dashboard = () => {
                 </div>
             ), { duration:8000, position:'top-right' });
         });
-        socket.on('SILENT_REFRESH', () => { setTimeout(() => { fetchAlerts(currentPage, { dataset: activeDataset, status: activeTab, search: searchTerm, muleStatus: currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined }); fetchDatasets(); fetchLogsAndFiles(); }, 0); });
+        socket.on('SILENT_REFRESH', () => { 
+            setTimeout(() => { 
+                const s = socketStateRef.current;
+                fetchAlertsRef.current(s.currentPage, { dataset: s.activeDataset, status: s.activeTab, search: s.searchTerm, muleStatus: s.currentView === 'MULE_REGISTRY' ? 'Confirmed Mule' : undefined }); 
+                fetchDatasets(); 
+                fetchLogsAndFiles(); 
+            }, 0); 
+        });
         socket.on('NEW_LOG', (l) => setLogs(prev => [l, ...prev]));
         socket.on('ENGINE_PROGRESS', (payload) => {
             try {

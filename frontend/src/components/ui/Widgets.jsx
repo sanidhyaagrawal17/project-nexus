@@ -2,18 +2,14 @@ import React from 'react';
 import T from '../../lib/theme';
 
 export const RiskGauge = ({ score, status }) => {
-    const r = 48, circ = 2 * Math.PI * r, arc = circ * 0.75, filled = arc * (score / 100);
     const isCrit = status === 'Critical';
-    const color  = isCrit ? T.crit : T.high;
+    const color = isCrit ? T.crit : T.high;
     return (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, minWidth:120 }}>
-            <svg width="120" height="90" viewBox="0 0 120 95">
-                <circle cx="60" cy="68" r={r} fill="none" stroke={T.border} strokeWidth="8" strokeDasharray={`${arc} ${circ-arc}`} strokeDashoffset={circ*0.125} strokeLinecap="round"/>
-                <circle cx="60" cy="68" r={r} fill="none" stroke={color} strokeWidth="8" strokeDasharray={`${filled} ${circ-filled}`} strokeDashoffset={circ*0.125} strokeLinecap="round" style={{ transition:'stroke-dasharray 0.6s ease', filter: 'drop-shadow(0 0 6px currentColor)' }}/>
-                <text x="60" y="63" textAnchor="middle" fontSize="19" fontWeight="600" fill={color} fontFamily="'IBM Plex Mono', 'Courier New', monospace" style={{ textShadow: `0 0 8px ${color}` }}>{score.toFixed(1)}%</text>
-                <text x="60" y="78" textAnchor="middle" fontSize="8" fill={T.txt3} fontFamily="monospace" letterSpacing="1.5">AI CONFIDENCE</text>
-            </svg>
-            <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color, background: isCrit ? T.critBg : T.highBg, border:`1px solid ${isCrit ? T.critBdr : T.highBdr}`, padding:'3px 10px', borderRadius:9999 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 120 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: 'monospace' }}>
+                {score.toFixed(0)}%
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color, background: isCrit ? T.critBg : T.highBg, border: `1px solid ${color}`, padding: '4px 8px', borderRadius: 4 }}>
                 {status}
             </span>
         </div>
@@ -21,8 +17,8 @@ export const RiskGauge = ({ score, status }) => {
 };
 
 export const RiskBar = ({ score, status }) => (
-    <div style={{ height:4, background: T.raised, borderRadius:2, overflow:'hidden', marginTop:5, boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)' }}>
-        <div style={{ height:'100%', width:`${score}%`, borderRadius:2, transition:'width 0.5s ease', background: status === 'Critical' ? T.crit : T.high, boxShadow: `0 0 8px ${status === 'Critical' ? T.crit : T.high}` }} />
+    <div style={{ height:4, background: T.raised, borderRadius:2, overflow:'hidden', marginTop:5, border: `1px solid ${T.borderHi}` }}>
+        <div style={{ height:'100%', width:`${score}%`, borderRadius:2, transition:'width 0.5s ease', background: status === 'Critical' ? T.crit : T.high }} />
     </div>
 );
 
@@ -62,7 +58,7 @@ export const BarTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, padding:'12px 16px', fontSize:12, boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, padding:'12px 16px', fontSize:12 }}>
             <p style={{ color:T.txt2, fontFamily:'monospace', marginBottom:4, fontSize:11 }}>{d.name}</p>
             <p style={{ color:T.txt1, marginBottom:6, fontWeight:600 }}>{d.fullName}</p>
             <p style={{ color:T.accent, fontWeight:700 }}>{d.count} occurrences</p>
@@ -74,7 +70,7 @@ export const ImportanceTooltip = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, padding:'12px 16px', fontSize:12, boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ background:T.raised, border:`1px solid ${T.borderHi}`, borderRadius:8, padding:'12px 16px', fontSize:12 }}>
             <p style={{ color:T.txt2, fontFamily:'monospace', marginBottom:4, fontSize:11 }}>{d.name}</p>
             {d.fullName && <p style={{ color:T.txt1, marginBottom:6, fontWeight:600 }}>{d.fullName}</p>}
             <p style={{ color:T.accent, fontWeight:700 }}>Importance: {typeof d.importance === 'number' ? d.importance.toFixed(4) : '—'}</p>
@@ -159,7 +155,7 @@ export const TD = ({ children, right, mono, muted }) => (
 );
 
 export const Card = ({ children, style }) => (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', overflow:'hidden', ...style }}>
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, overflow:'hidden', ...style }}>
         {children}
     </div>
 );
@@ -173,7 +169,7 @@ export const PadCard = ({ children, style }) => (
 export const MetricCard = ({ label, value, color = T.txt1, note }) => (
     <Card style={{ padding:'18px 20px', display:'flex', flexDirection:'column', justifyContent:'center' }}>
         <div style={{ fontSize:10, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10 }}>{label}</div>
-        <div style={{ fontSize:28, fontWeight:800, color, fontFamily:'monospace', textShadow: color !== T.txt1 ? `0 0 12px ${color}60` : 'none' }}>{value}</div>
+        <div style={{ fontSize:28, fontWeight:800, color, fontFamily:'monospace' }}>{value}</div>
         {note && <div style={{ fontSize:11, color:T.txt3, marginTop:8 }}>{note}</div>}
     </Card>
 );
@@ -191,13 +187,11 @@ export const hoverBorderButtonProps = (baseColor = T.txt3, hoverColor = T.txt1, 
         e.currentTarget.style.color = hoverColor;
         e.currentTarget.style.borderColor = hoverBorder;
         e.currentTarget.style.background = hoverBackground;
-        e.currentTarget.style.boxShadow = `0 0 12px ${hoverBackground}`;
     },
     onMouseLeave: e => {
         e.currentTarget.style.color = baseColor;
         e.currentTarget.style.borderColor = T.border;
         e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.boxShadow = 'none';
     },
 });
 

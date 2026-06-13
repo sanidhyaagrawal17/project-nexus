@@ -1,20 +1,25 @@
-FROM node:22-bookworm-slim
+# Use the Node image that supports Debian (Bookworm)
+FROM node:22-bookworm
 
-WORKDIR /app
-
-# Install minimal OS packages if needed
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+# Install Python and Pip
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Two-step copy: copy backend package files first to leverage Docker cache for dependencies
-COPY backend/package*.json ./backend/
-RUN cd backend && npm ci --no-audit --no-fund --omit=dev
-
-# Copy remaining source
-COPY backend ./backend
-
 WORKDIR /app/backend
+
+# FIX 1: Explicitly copy from the backend/ directory
+COPY backend/package*.json ./
+RUN npm install
+
+# This is already correct because it specifies ml-pipeline/ relative to root
+COPY ml-pipeline/requirements.txt ./
+RUN pip3 install --break-system-packages -r requirements.txt
+
+# FIX 2: Copy the backend source code specifically
+COPY backend/ ./
+
 EXPOSE 5000
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

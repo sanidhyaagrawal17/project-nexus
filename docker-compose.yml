@@ -28,11 +28,14 @@ services:
       MAX_URLENCODED_BODY_SIZE: 100mb
       MAX_UPLOAD_SIZE_MB: 100
     volumes:
-      - ./ml-pipeline:/app/ml-pipeline
+      # Map the backend code
+      - ./backend:/app/backend
+      # CRITICAL: Map the models folder so Python can find the .pkl files
+      - ./models:/app/backend/ml_models
+      # Map the inference script
+      - ./backend/nexus_inference.py:/app/backend/nexus_inference.py
     depends_on:
       mongodb:
-        condition: service_healthy
-      ml-pipeline:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

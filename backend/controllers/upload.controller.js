@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const Alert = require('../models/Alert'); // Your Mongoose model
-const FileMetadata = require('../models/FileMetadata');
+const FileMetadata = require('../models/ProcessedFile');
 
 exports.processUpload = async (req, res) => {
     const filePath = req.file.path;

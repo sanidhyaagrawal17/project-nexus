@@ -98,9 +98,10 @@ def generate_hackathon_csv(filename='demo_upload_data.csv', num_rows=500):
     mule_idx = df['F3924'] == 1
     
     # Using .loc with explicit column names
-    df.loc[mule_idx, 'F3912'] = df.loc[mule_idx, 'F3912'].astype(float) + 6.0
-    df.loc[mule_idx, 'F3799'] = df.loc[mule_idx, 'F3799'].astype(float) + 5.5
-    df.loc[mule_idx, 'F1165'] = df.loc[mule_idx, 'F1165'].astype(float) - 4.0
+    num_mules = mule_idx.sum()
+    df.loc[mule_idx, 'F3912'] = df.loc[mule_idx, 'F3912'].astype(float) + np.random.normal(2.5, 1.0, size=num_mules)
+    df.loc[mule_idx, 'F3799'] = df.loc[mule_idx, 'F3799'].astype(float) + np.random.normal(2.2, 1.0, size=num_mules)
+    df.loc[mule_idx, 'F1165'] = df.loc[mule_idx, 'F1165'].astype(float) - np.random.normal(2.0, 1.0, size=num_mules)
     
     # 5. Inject "Dirty Data" - This will now work because df is 'object' type
     print("[*] Injecting text artifacts ('Oct25', 'Pending')...")

@@ -12,11 +12,11 @@ warnings.filterwarnings('ignore')
 def run_inference(csv_path):
     try:
         # 1. Load the frozen models and schema
-        model = joblib.load('models/nexus_xgboost.pkl')
-        calibrator = joblib.load('models/nexus_calibrated_model.pkl')
-        iso_forest = joblib.load('models/nexus_iso_forest.pkl')
-        scaler = joblib.load('models/nexus_anomaly_scaler.pkl')
-        expected_features = joblib.load('models/nexus_feature_schema.pkl')
+        model = joblib.load('ml_models/nexus_xgboost.pkl')
+        calibrator = joblib.load('ml_models/nexus_calibrated_model.pkl')
+        iso_forest = joblib.load('ml_models/nexus_iso_forest.pkl')
+        scaler = joblib.load('ml_models/nexus_anomaly_scaler.pkl')
+        expected_features = joblib.load('ml_models/nexus_feature_schema.pkl')
 
         # 2. Load and align the dataset
         df = pd.read_csv(csv_path)
@@ -26,43 +26,33 @@ def run_inference(csv_path):
         X = df.reindex(columns=expected_features, fill_value=0)
 
         # 3. Vectorized Predictions (Extremely Fast)
-        # Get base anomaly scores
         raw_anomaly = iso_forest.score_samples(X)
         anomaly_scores = scaler.transform(raw_anomaly.reshape(-1, 1)).flatten()
-        
-        # Get fraud probabilities from the calibrated XGBoost model
         fraud_probs = calibrator.predict_proba(X)[:, 1]
 
         # 4. Conditional SHAP Explainability (The massive time-saver)
         # Only compute SHAP for rows where probability > 0.70 (High Risk/Critical)
         explainer = shap.TreeExplainer(model)
-        
-        results = []
         flagged_indices = np.where(fraud_probs >= 0.70)[0]
         
-        # Pre-calculate SHAP only for the subset of flagged rows
         if len(flagged_indices) > 0:
             X_flagged = X.iloc[flagged_indices]
             shap_values_flagged = explainer.shap_values(X_flagged)
         else:
             shap_values_flagged = []
 
-        # 5. Build the Payload
+        # 5. Build the Payload (Clean Vectorized Data Prep)
+        risk_scores = fraud_probs * 100
+        
+        # Vectorized status assignment
+        statuses = np.where(risk_scores >= 95.0, 'Critical', 
+                            np.where(risk_scores >= 85.0, 'High Risk', 'Safe'))
+        
         flagged_dict = dict(zip(flagged_indices, range(len(flagged_indices))))
+        results = []
 
+        # Fast payload construction
         for i in range(len(df)):
-            prob = float(fraud_probs[i])
-            risk_score = prob * 100
-            
-            # Determine Status based on backend config thresholds
-            if risk_score >= 95.0:
-                status = 'Critical'
-            elif risk_score >= 85.0:
-                status = 'High Risk'
-            else:
-                status = 'Safe'
-
-            # Attach Top Features ONLY if it was flagged
             top_features = []
             if i in flagged_dict:
                 shap_idx = flagged_dict[i]
@@ -80,9 +70,9 @@ def run_inference(csv_path):
 
             results.append({
                 "accountId": str(account_ids[i]),
-                "riskScore": risk_score,
+                "riskScore": float(risk_scores[i]),
                 "anomalyScore": float(anomaly_scores[i]),
-                "status": status,
+                "status": str(statuses[i]),
                 "topFeatures": top_features
             })
 
