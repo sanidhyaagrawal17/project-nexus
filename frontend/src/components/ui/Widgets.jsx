@@ -4,14 +4,18 @@ import T from '../../lib/theme';
 export const RiskGauge = ({ score, status }) => {
     const isCrit = status === 'Critical';
     const color = isCrit ? T.crit : T.high;
+    const s = Math.min(100, Math.max(0, score || 0));
+    const filled = 84.82 * (s / 100);
+    const empty = 113.1 - filled;
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 120 }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: 'monospace' }}>
-                {score.toFixed(0)}%
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width: 48 }}>
+            <div style={{ width: 48, height: 48, boxShadow: isCrit ? `0 0 12px ${T.critBg}` : 'none', borderRadius: '50%' }}>
+                <svg viewBox="0 0 48 48" width="48" height="48">
+                    <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(128,128,128,0.18)" strokeWidth="5" strokeDasharray="84.82 28.27" transform="rotate(135 24 24)" />
+                    <circle cx="24" cy="24" r="18" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${filled} ${empty}`} transform="rotate(135 24 24)" />
+                    <text x="24" y="29" textAnchor="middle" fill="currentColor" fontSize="11" fontWeight="500" style={{ color: color }}>{Math.round(s)}%</text>
+                </svg>
             </div>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color, background: isCrit ? T.critBg : T.highBg, border: `1px solid ${color}`, padding: '4px 8px', borderRadius: 4 }}>
-                {status}
-            </span>
         </div>
     );
 };
@@ -47,8 +51,11 @@ export const ActorBadge = ({ actor }) => {
 
 export const alertAgeMs = (detectedAt) => Date.now() - new Date(detectedAt || 0).getTime();
 export const formatAge = (ms) => {
-    const h = Math.floor(ms / 3600000);
-    if (h < 24) return `${h}h`;
+    const totalMinutes = Math.floor(ms / 60000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h < 1) return `${m}m`;
+    if (h < 24) return `${h}h ${m}m`;
     const days = Math.floor(h / 24);
     return `${days}d ${h % 24}h`;
 };
@@ -87,7 +94,6 @@ export const AlertAge = ({ detectedAt }) => {
         <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
             <span style={{ fontSize:12, fontWeight:700, color, fontFamily:'monospace' }}>{text}</span>
             {h > 72 && <span style={{ fontSize:9, color:T.crit, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em' }}>OVERDUE</span>}
-            {h > 24 && h <= 72 && <span style={{ fontSize:9, color:T.high, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em' }}>SLA WARNING</span>}
         </div>
     );
 };
@@ -115,9 +121,16 @@ export const ConfusionMatrix = ({ matrix }) => {
     );
 };
 
-export const ThresholdSlider = ({ alertThreshold, critThreshold, activeAccent, onApply }) => {
+export const ThresholdSlider = ({ alertThreshold, critThreshold, activeAccent, onApply, thresholdCurve }) => {
     const [alert, setAlert] = React.useState(alertThreshold || 0.85);
     const [crit,  setCrit]  = React.useState(critThreshold  || 0.95);
+
+    const preview = React.useMemo(() => {
+        if (!thresholdCurve || thresholdCurve.length === 0) return null;
+        const sorted = [...thresholdCurve].sort((a, b) => Math.abs(a.threshold - alert) - Math.abs(b.threshold - alert));
+        return sorted[0] || null;
+    }, [thresholdCurve, alert]);
+
     return (
         <div style={{ padding:'20px 24px', background:T.raised, border:`1px solid ${T.border}`, borderRadius:12, marginTop:16 }}>
             <div style={{ fontSize:11, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:16, fontWeight:700 }}>Interactive Threshold Tuning</div>
@@ -134,7 +147,27 @@ export const ThresholdSlider = ({ alertThreshold, critThreshold, activeAccent, o
                         style={{ width:'100%', accentColor:color }} />
                 </div>
             ))}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
+            {preview && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, marginTop:12, padding:'12px 16px', background:T.bg, border:`1px solid ${T.border}`, borderRadius:8 }}>
+                    <div>
+                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>Alert Count</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:T.txt1, fontFamily:'monospace' }}>{preview.alert_count ?? '—'}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>Precision</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:T.ok, fontFamily:'monospace' }}>{typeof preview.precision === 'number' ? (preview.precision * 100).toFixed(1) + '%' : '—'}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>Recall</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:T.high, fontFamily:'monospace' }}>{typeof preview.recall === 'number' ? (preview.recall * 100).toFixed(1) + '%' : '—'}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize:9, color:T.txt3, textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700 }}>F1 Score</div>
+                        <div style={{ fontSize:16, fontWeight:800, color:activeAccent, fontFamily:'monospace' }}>{typeof preview.f1 === 'number' ? (preview.f1 * 100).toFixed(1) + '%' : '—'}</div>
+                    </div>
+                </div>
+            )}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:12 }}>
                 <button onClick={() => { setAlert(alertThreshold || 0.85); setCrit(critThreshold || 0.95); }} style={{ padding:'8px 16px', borderRadius:8, border:`1px solid ${T.border}`, background:'transparent', color:T.txt2, fontSize:12, fontWeight:600, cursor:'pointer' }}>Reset</button>
                 <button onClick={() => onApply && onApply(alert, crit)} style={{ padding:'8px 16px', borderRadius:8, border:`1px solid ${activeAccent}`, background:activeAccent, color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>Apply Thresholds</button>
             </div>

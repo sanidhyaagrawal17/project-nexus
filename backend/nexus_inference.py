@@ -22,17 +22,71 @@ def run_inference(csv_path):
         df = pd.read_csv(csv_path)
         account_ids = df['ACCOUNT_ID'] if 'ACCOUNT_ID' in df.columns else df.index
         
+        # Strip Anomaly_Score for IsoForest
+        feature_columns = expected_features[:-1] if expected_features and expected_features[-1] == 'Anomaly_Score' else expected_features
+
         # Ensure exact column match with training data (impute missing with 0)
-        X = df.reindex(columns=expected_features, fill_value=0)
+        X_base = df.reindex(columns=feature_columns, fill_value=0)
+
+        # Coerce all columns to numeric, filling non-convertible with 0
+        for col in X_base.columns:
+            X_base[col] = pd.to_numeric(X_base[col], errors='coerce').fillna(0.0)
 
         # 3. Vectorized Predictions (Extremely Fast)
-        raw_anomaly = iso_forest.score_samples(X)
-        anomaly_scores = scaler.transform(raw_anomaly.reshape(-1, 1)).flatten()
+        # Use decision_function to match training pipeline
+        raw_anomaly = iso_forest.decision_function(X_base)
+        
+        # Scale anomaly scores
+        min_score = scaler.get('min', float(np.min(raw_anomaly)))
+        max_score = scaler.get('max', float(np.max(raw_anomaly)))
+        if max_score > min_score:
+            anomaly_scores = ((raw_anomaly - min_score) / (max_score - min_score)) * 100
+        else:
+            anomaly_scores = np.zeros(len(raw_anomaly))
+
+        # Add Anomaly_Score for XGBoost
+        X = X_base.copy()
+        X['Anomaly_Score'] = anomaly_scores
+        X = X.reindex(columns=expected_features, fill_value=0)
+
         fraud_probs = calibrator.predict_proba(X)[:, 1]
 
+        # Try to extract the base XGBoost model from the CalibratedClassifierCV
+        if hasattr(calibrator, 'estimator'):
+            model = calibrator.estimator
+        elif hasattr(calibrator, 'calibrated_classifiers_'):
+            model = calibrator.calibrated_classifiers_[0].estimator
+        else:
+            model = calibrator
+
+        # PATCH FOR XGBOOST 3.0+ BASE SCORE FORMAT BUG IN SHAP
+        try:
+            import json
+            booster = model.get_booster()
+            config = json.loads(booster.save_config())
+            if 'learner' in config and 'learner_model_param' in config['learner']:
+                base_score = config['learner']['learner_model_param'].get('base_score')
+                if base_score == '[5E-1]' or getattr(base_score, 'startswith', lambda x: False)('['):
+                    config['learner']['learner_model_param']['base_score'] = '0.5'
+                    booster.load_config(json.dumps(config))
+        except Exception as e:
+            print("Warning: Failed to patch XGBoost config:", e)
+
         # 4. Conditional SHAP Explainability (The massive time-saver)
-        # Only compute SHAP for rows where probability > 0.70 (High Risk/Critical)
-        explainer = shap.TreeExplainer(model)
+        # Monkeypatch float to fix SHAP bug with XGBoost 3.X
+        import builtins
+        _original_float = builtins.float
+        def _patched_float(v):
+            if isinstance(v, str) and (v == '[5E-1]' or getattr(v, 'startswith', lambda x: False)('[')):
+                return 0.5
+            return _original_float(v)
+        builtins.float = _patched_float
+        
+        try:
+            # Use TreeExplainer on the original model
+            explainer = shap.TreeExplainer(model)
+        finally:
+            builtins.float = _original_float
         flagged_indices = np.where(fraud_probs >= 0.70)[0]
         
         if len(flagged_indices) > 0:
@@ -80,6 +134,8 @@ def run_inference(csv_path):
         print(json.dumps({"success": True, "data": results}))
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(json.dumps({"success": False, "error": str(e)}))
         sys.exit(1)
 

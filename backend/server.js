@@ -5,6 +5,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const User = require('./models/User');
+const PDFDocument = require('pdfkit');
+const { generateSarDraft } = require('./sarTemplate');
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 // Conditional lightweight faker shim for test environments to avoid ESM parsing issues in Jest.
@@ -92,6 +99,27 @@ app.use(cors({
     },
     credentials: true,
 }));
+
+function requireRole(...allowedRoles) {
+    return async (req, res, next) => {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'No token provided' });
+        }
+        const token = authHeader.split(' ')[1];
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'nexus_super_secret_key_2026');
+            if (allowedRoles.length && !allowedRoles.includes(decoded.role)) {
+                return res.status(403).json({ success: false, message: 'Insufficient role' });
+            }
+            req.user = decoded;
+            next();
+        } catch (err) {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+    };
+}
+
 app.use(express.json({ limit: MAX_JSON_BODY_SIZE }));
 app.use(express.urlencoded({ limit: MAX_URLENCODED_BODY_SIZE, extended: true }));
 
@@ -843,6 +871,197 @@ const liveStreamProcessor = createLiveStreamProcessor({
     },
 });
 
+
+// ============================================================================
+// AUTHENTICATION
+// ============================================================================
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+        if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        
+        const match = await bcrypt.compare(password, user.passwordHash);
+        if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        
+        const token = jwt.sign({ id: user._id, username: user.username, role: user.role }, process.env.JWT_SECRET || 'nexus_super_secret_key_2026', { expiresIn: '12h' });
+        res.json({ success: true, token, user: { username: user.username, role: user.role } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+
+// ============================================================================
+// SAR REPORTING (NO LLMs)
+// ============================================================================
+app.post('/api/sar-draft', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const { accountId } = req.body;
+        if (!accountId) return res.status(400).json({ success: false, message: 'accountId required' });
+        
+        const alert = await Alert.findOne({ accountId });
+        if (!alert) return res.status(404).json({ success: false, message: 'Alert not found' });
+        
+        const draft = generateSarDraft(alert);
+        res.json({ success: true, draft });
+    } catch (err) {
+        console.error('[!] sar-draft error', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+app.post('/api/sar-pdf', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const { accountId } = req.body;
+        if (!accountId) return res.status(400).json({ success: false, message: 'accountId required' });
+        
+        const alert = await Alert.findOne({ accountId });
+        if (!alert) return res.status(404).json({ success: false, message: 'Alert not found' });
+        
+        const draft = generateSarDraft(alert);
+        
+        // Generate PDF
+        const doc = new PDFDocument({ margin: 50 });
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="SAR_${accountId}_${Date.now()}.pdf"`);
+        
+        doc.pipe(res);
+        
+        // Header
+        doc.fontSize(20).font('Helvetica-Bold').text('Suspicious Activity Report (SAR)', { align: 'center' });
+        doc.moveDown();
+        
+        // Metadata
+        doc.fontSize(12).font('Helvetica').text(`Date Generated: ${new Date().toLocaleString()}`);
+        doc.text(`Target Account: ${accountId}`);
+        doc.text(`Risk Score: ${(alert.riskScore * 100).toFixed(0)}%`);
+        doc.text(`Detection Date: ${new Date(alert.detectedAt).toLocaleString()}`);
+        doc.moveDown();
+        
+        // Narrative
+        doc.fontSize(14).font('Helvetica-Bold').text('Narrative Summary');
+        doc.moveDown(0.5);
+        doc.fontSize(11).font('Helvetica').text(draft, { align: 'justify', lineGap: 4 });
+        doc.moveDown();
+        
+        // KYC Details Table
+        if (alert.kycDetails) {
+            doc.fontSize(14).font('Helvetica-Bold').text('Subject Information');
+            doc.moveDown(0.5);
+            doc.fontSize(11).font('Helvetica');
+            for (const [key, val] of Object.entries(alert.kycDetails)) {
+                doc.text(`${key.toUpperCase()}: ${val}`);
+            }
+        }
+        
+        doc.end();
+        
+    } catch (err) {
+        console.error('[!] sar-pdf error', err);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Server error' });
+        }
+    }
+});
+
+
+// ============================================================================
+// MODEL A/B TESTING
+// ============================================================================
+app.post('/api/compare-models', requireRole('OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const { sourceFileName } = req.body;
+        // Default to demo data if none provided
+        const csvPath = sourceFileName ? `data/${sourceFileName}` : 'data/demo_upload_data.csv';
+        
+        const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+        
+        const form = new FormData();
+        form.append('csv_path', csvPath);
+        
+        const mlRes = await fetch(`${ML_SERVICE_URL}/predict_compare`, {
+            method: 'POST',
+            body: form
+        });
+        
+        const data = await mlRes.json();
+        
+        if (data.success) {
+            res.json(data);
+        } else {
+            res.status(500).json(data);
+        }
+    } catch (err) {
+        console.error('[!] compare-models error', err);
+        res.status(500).json({ success: false, message: 'ML Service failed to perform comparison. Standby model may be unavailable or offline.' });
+    }
+});
+
+// Network Graph UI Endpoint
+app.get('/api/graph-topology/:sourceFileName', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const sourceFileName = req.params.sourceFileName;
+        const filePath = path.join(__dirname, '../data/uploads', sourceFileName);
+        
+        let targetFile = filePath;
+        if (!fs.existsSync(filePath)) {
+            // fallback to demo
+            targetFile = path.join(__dirname, '../data', 'demo_transaction_graph.csv');
+            if (!fs.existsSync(targetFile)) {
+                return res.status(404).json({ success: false, message: 'CSV not found' });
+            }
+        }
+        
+        const content = fs.readFileSync(targetFile, 'utf-8');
+        const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) return res.status(400).json({ success: false, message: 'Empty CSV' });
+        
+        const headers = lines[0].split(',');
+        const nodes = [];
+        const links = [];
+        const nodeSet = new Set();
+        
+        for (let i = 1; i < Math.min(lines.length, 500); i++) {
+            const parts = lines[i].split(',');
+            const source = parts[1];
+            const target = parts[2];
+            const amount = parseFloat(parts[3]) || 0;
+            
+            if (source && target) {
+                if (!nodeSet.has(source)) {
+                    nodeSet.add(source);
+                    nodes.push({ id: source, group: 1 });
+                }
+                if (!nodeSet.has(target)) {
+                    nodeSet.add(target);
+                    nodes.push({ id: target, group: 2 });
+                }
+                links.push({ source, target, value: amount });
+            }
+        }
+        res.json({ success: true, data: { nodes, links } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Geo Heatmap Endpoint
+app.get('/api/geo-distribution', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const data = [
+            { id: 'NY', name: 'New York', coordinates: [-74.006, 40.7128], value: 50 },
+            { id: 'SF', name: 'San Francisco', coordinates: [-122.4194, 37.7749], value: 30 },
+            { id: 'LN', name: 'London', coordinates: [-0.1278, 51.5074], value: 20 },
+            { id: 'TK', name: 'Tokyo', coordinates: [139.6917, 35.6895], value: 40 },
+        ];
+        res.json({ success: true, data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/alerts', async (req, res) => {
     try {
             const page = Math.max(1, Number.parseInt(req.query.page || '1', 10));
@@ -908,6 +1127,23 @@ app.get('/api/files', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+app.post('/api/threshold', requireRole('OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const { alert_threshold, critical_threshold } = req.body;
+        if (alert_threshold == null || critical_threshold == null) return res.status(400).json({ success: false, message: 'Missing thresholds' });
+        
+        let metrics = readJsonFileSafe(metricsPath) || {};
+        metrics.thresholds = {
+            alert_threshold: Number(alert_threshold),
+            critical_threshold: Number(critical_threshold)
+        };
+        fs.writeFileSync(metricsPath, JSON.stringify(metrics, null, 2));
+        res.json({ success: true, thresholds: metrics.thresholds });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/status', (req, res) => res.json({ status: currentEngineStatus }));
 
 app.get('/api/config', (req, res) => {
@@ -922,6 +1158,126 @@ app.get('/api/config', (req, res) => {
         droppedFeatures: metrics?.droppedFeatures || [],
         featureImportance: metrics?.featureImportance || [],
     });
+});
+
+// ── Feedback Stats (3.2) ──────────────────────────────────────────────────────
+app.get('/api/feedback/stats', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const [total, confirmedFraud, markedSafe] = await Promise.all([
+            AnalystFeedback.countDocuments({}),
+            AnalystFeedback.countDocuments({ decision: 'CONFIRMED_FRAUD' }),
+            AnalystFeedback.countDocuments({ decision: 'SAFE' }),
+        ]);
+        const precision = total > 0 ? (confirmedFraud / total * 100).toFixed(1) + '%' : 'N/A';
+        res.json({ success: true, stats: { total, confirmedFraud, markedSafe, precision } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ── Model Version (3.3) ───────────────────────────────────────────────────────
+app.get('/api/model-version', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), (req, res) => {
+    try {
+        const metrics = readJsonFileSafe(metricsPath);
+        if (!metrics) return res.status(404).json({ success: false, message: 'Model metrics not found' });
+        const stat = fs.statSync(metricsPath);
+        res.json({
+            success: true,
+            version: {
+                trainedAt: stat.mtime,
+                trainingSamples: metrics.metrics?.sample_count || null,
+                feedbackLabels: null, // populated by future retrain run
+                schemaType: metrics.inputSchema?.type || null,
+                featureCount: metrics.featureCount || null,
+                threshold: metrics.thresholds?.alert_threshold || null,
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ── Bulk Resolution (3.9) ─────────────────────────────────────────────────────
+app.post('/api/resolve-bulk', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 20 }), async (req, res) => {
+    const { alertIds, decision = 'SAFE' } = req.body;
+    if (!Array.isArray(alertIds) || alertIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'alertIds must be a non-empty array' });
+    }
+    try {
+        // Fetch alert accountIds from the DB
+        const alerts = await Alert.find({ _id: { $in: alertIds } }, { accountId: 1, sourceFileName: 1 });
+        const results = await Promise.allSettled(alerts.map(async (alert) => {
+            await AnalystFeedback.create({ accountId: alert.accountId, decision, notes: 'bulk', sourceFileName: alert.sourceFileName, reviewedBy: 'ANALYST' });
+            const message = decision === 'CONFIRMED_FRAUD'
+                ? `Bulk: confirmed Threat [${alert.accountId}] as FRAUD.`
+                : `Bulk: marked Threat [${alert.accountId}] as SAFE.`;
+            await createLog('ANALYST', 'RESOLUTION', message, alert.accountId);
+        }));
+        const failed = results.filter(r => r.status === 'rejected').length;
+        res.json({ success: true, resolved: alerts.length - failed, failed });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ── Feedback Stats (3.2) ──────────────────────────────────────────────────────
+app.get('/api/feedback/stats', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), async (req, res) => {
+    try {
+        const [total, confirmedFraud, markedSafe] = await Promise.all([
+            AnalystFeedback.countDocuments({}),
+            AnalystFeedback.countDocuments({ decision: 'CONFIRMED_FRAUD' }),
+            AnalystFeedback.countDocuments({ decision: 'SAFE' }),
+        ]);
+        const precision = total > 0 ? (confirmedFraud / total * 100).toFixed(1) + '%' : 'N/A';
+        res.json({ success: true, stats: { total, confirmedFraud, markedSafe, precision } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ── Model Version (3.3) ───────────────────────────────────────────────────────
+app.get('/api/model-version', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), (req, res) => {
+    try {
+        const metrics = readJsonFileSafe(metricsPath);
+        if (!metrics) return res.status(404).json({ success: false, message: 'Model metrics not found' });
+        const stat = fs.statSync(metricsPath);
+        res.json({
+            success: true,
+            version: {
+                trainedAt: stat.mtime,
+                trainingSamples: metrics.metrics?.sample_count || null,
+                feedbackLabels: null, // populated by future retrain run
+                schemaType: metrics.inputSchema?.type || null,
+                featureCount: metrics.featureCount || null,
+                threshold: metrics.thresholds?.alert_threshold || null,
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ── Bulk Resolution (3.9) ─────────────────────────────────────────────────────
+app.post('/api/resolve-bulk', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 20 }), async (req, res) => {
+    const { alertIds, decision = 'SAFE' } = req.body;
+    if (!Array.isArray(alertIds) || alertIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'alertIds must be a non-empty array' });
+    }
+    try {
+        // Fetch alert accountIds from the DB
+        const alerts = await Alert.find({ _id: { $in: alertIds } });
+        const results = await Promise.allSettled(alerts.map(async (alert) => {
+            await AnalystFeedback.create({ accountId: alert.accountId, decision, notes: 'bulk', sourceFileName: alert.sourceFileName, reviewedBy: 'ANALYST' });
+            const message = decision === 'CONFIRMED_FRAUD'
+                ? `Bulk: confirmed Threat [${alert.accountId}] as FRAUD.`
+                : `Bulk: marked Threat [${alert.accountId}] as SAFE.`;
+            await createLog('ANALYST', 'RESOLUTION', message, alert.accountId);
+        }));
+        const failed = results.filter(r => r.status === 'rejected').length;
+        res.json({ success: true, resolved: alerts.length - failed, failed });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 app.post('/api/live-events', createSimpleRateLimit({ windowMs: 60 * 1000, maxRequests: 120 }), async (req, res) => {
@@ -958,7 +1314,7 @@ app.get('/api/metrics', (req, res) => {
 
 // Protect system-wipe: admin-only
 // Re-register the route with requireAdmin
-app.delete('/api/system-wipe', requireAdmin, createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 3 }), async (req, res) => {
+app.delete('/api/system-wipe', requireRole('ADMIN'), createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 3 }), async (req, res) => {
     // delegate to existing handler by calling same logic (kept simple duplication for clarity)
     try {
         await Alert.deleteMany({});
@@ -984,7 +1340,7 @@ app.delete('/api/system-wipe', requireAdmin, createSimpleRateLimit({ windowMs: 1
     } catch (err) { return res.status(500).json({ success: false, message: err.message }); }
 });
 
-app.post('/api/resolve', createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 60 }), async (req, res) => {
+app.post('/api/resolve', requireRole('ANALYST', 'OVERSEER', 'ADMIN'), createSimpleRateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 60 }), async (req, res) => {
     const { accountId, decision = 'SAFE', notes = '', sourceFileName = null } = req.body;
     try {
         await AnalystFeedback.create({ accountId, decision, notes, sourceFileName, reviewedBy: 'ANALYST' });
@@ -1210,7 +1566,7 @@ app.get('/api/upload-config', (req, res) => {
     res.json({ success: true, maxUploadMB: Number.isFinite(maxUploadSizeMB) ? maxUploadSizeMB : null, enabled: Boolean(uploadLimitEnabled) });
 });
 
-app.post('/api/upload-config', requireAdmin, async (req, res) => {
+app.post('/api/upload-config', requireRole('OVERSEER', 'ADMIN'), async (req, res) => {
     try {
         const { maxUploadMB, enabled } = req.body || {};
         if (typeof enabled === 'boolean') uploadLimitEnabled = enabled;
@@ -1285,7 +1641,7 @@ app.put('/api/alerts/:id/mule', createSimpleRateLimit({ windowMs: 60 * 1000, max
 });
 
 // Admin: trigger an immediate retrain job
-app.post('/api/retrain', requireAdmin, async (req, res) => {
+app.post('/api/retrain', requireRole('OVERSEER', 'ADMIN'), async (req, res) => {
     try {
         const scriptPath = path.join(__dirname, '../ml-pipeline/retrain_cron.py');
         const pythonExecutable = process.env.PYTHON_EXECUTABLE || 'python3';

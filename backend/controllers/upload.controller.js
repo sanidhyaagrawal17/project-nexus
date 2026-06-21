@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const path = require('path');
 const Alert = require('../models/Alert'); // Your Mongoose model
 const FileMetadata = require('../models/ProcessedFile');
 
@@ -9,7 +10,16 @@ exports.processUpload = async (req, res) => {
     // Emit progress to dashboard via Socket.io
     req.io.emit('ENGINE_PROGRESS', { status: 'initializing nexus ml engine...', phase: 2 });
 
-    const pythonProcess = spawn('python3', ['nexus_inference.py', filePath]);
+    // Use PYTHON_EXECUTABLE env var (default: 'python') — 'python3' fails on Windows
+    const pythonExe = process.env.PYTHON_EXECUTABLE || 'python';
+    // Resolve absolute file path — multer dest='uploads/' is relative to server CWD
+    const absoluteFilePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    const scriptPath = path.join(__dirname, 'nexus_inference.py');
+    const pythonProcess = spawn(pythonExe, [scriptPath, absoluteFilePath], {
+        cwd: __dirname,          // ml_models/ relative paths resolve correctly here
+        timeout: 120000,         // 120s hard kill — prevents zombie on OOM
+        maxBuffer: 50 * 1024 * 1024, // 50MB stdout buffer
+    });
 
     let dataString = '';
 
@@ -54,6 +64,7 @@ exports.processUpload = async (req, res) => {
             const highRiskCount = alertsToInsert.filter(a => a.status === 'High Risk').length;
 
             await FileMetadata.create({
+                fileHash: req.file.filename,
                 fileName: fileName,
                 totalAccountsScanned: alertsToInsert.length,
                 processedAt: new Date()

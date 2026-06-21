@@ -1,833 +1,643 @@
 {
     "success": true,
-    "count": 16,
+    "count": 11,
     "thresholds": {
-        "alert_threshold": 0.98,
-        "critical_threshold": 0.99,
-        "best_fbeta": 1.0,
-        "best_f1": 1.0,
-        "best_precision": 1.0,
-        "best_recall": 1.0
+        "alert_threshold": 0.22,
+        "critical_threshold": 0.95,
+        "best_fbeta": 0.7407407407407407,
+        "best_f1": 0.7407407407407407,
+        "best_precision": 0.5714285714285714,
+        "best_recall": 0.8
     },
     "metrics": {
-        "threshold": 0.98,
-        "accuracy": 1.0,
-        "precision": 1.0,
+        "threshold": 0.22,
+        "accuracy": 0.95,
+        "precision": 0.5454545454545454,
         "recall": 1.0,
-        "f1": 1.0,
-        "roc_auc": 1.0,
-        "pr_auc": 1.0,
+        "f1": 0.7058823529411765,
+        "roc_auc": 0.9822695035460993,
+        "pr_auc": 0.7794011544011543,
         "confusion_matrix": [
             [
-                1801,
-                0
+                89,
+                5
             ],
             [
                 0,
-                16
+                6
             ]
         ],
         "classification_report": {
             "0": {
                 "precision": 1.0,
-                "recall": 1.0,
-                "f1-score": 1.0,
-                "support": 1801.0
+                "recall": 0.9468085106382979,
+                "f1-score": 0.9726775956284153,
+                "support": 94.0
             },
             "1": {
-                "precision": 1.0,
+                "precision": 0.5454545454545454,
                 "recall": 1.0,
-                "f1-score": 1.0,
-                "support": 16.0
+                "f1-score": 0.7058823529411765,
+                "support": 6.0
             },
-            "accuracy": 1.0,
+            "accuracy": 0.95,
             "macro avg": {
-                "precision": 1.0,
-                "recall": 1.0,
-                "f1-score": 1.0,
-                "support": 1817.0
+                "precision": 0.7727272727272727,
+                "recall": 0.9734042553191489,
+                "f1-score": 0.8392799742847958,
+                "support": 100.0
             },
             "weighted avg": {
-                "precision": 1.0,
-                "recall": 1.0,
-                "f1-score": 1.0,
-                "support": 1817.0
+                "precision": 0.9727272727272727,
+                "recall": 0.95,
+                "f1-score": 0.956669881067181,
+                "support": 100.0
             }
         },
-        "alert_count": 16,
-        "sample_count": 1817,
+        "alert_count": 11,
+        "sample_count": 100,
         "calibration_used": true
     },
     "featureImportance": [
         {
+            "name": "F3004",
+            "importance": 0.05614599958062172
+        },
+        {
+            "name": "F1165",
+            "importance": 0.04362500086426735
+        },
+        {
+            "name": "F2302",
+            "importance": 0.031644001603126526
+        },
+        {
+            "name": "F1258",
+            "importance": 0.02965399995446205
+        },
+        {
+            "name": "F3585",
+            "importance": 0.026652000844478607
+        },
+        {
+            "name": "F2447",
+            "importance": 0.024495000019669533
+        },
+        {
+            "name": "F992",
+            "importance": 0.02227799966931343
+        },
+        {
+            "name": "F73",
+            "importance": 0.019607000052928925
+        },
+        {
+            "name": "F1101",
+            "importance": 0.019495999440550804
+        },
+        {
+            "name": "F2836",
+            "importance": 0.018052000552415848
+        },
+        {
+            "name": "F3002",
+            "importance": 0.01798499934375286
+        },
+        {
+            "name": "F3799",
+            "importance": 0.016474999487400055
+        },
+        {
+            "name": "F2324",
+            "importance": 0.015689000487327576
+        },
+        {
+            "name": "F3836_over_F321",
+            "importance": 0.01522700022906065
+        },
+        {
+            "name": "F1665",
+            "importance": 0.014941000379621983
+        },
+        {
+            "name": "F440",
+            "importance": 0.014581999741494656
+        },
+        {
+            "name": "F3277",
+            "importance": 0.014003000222146511
+        },
+        {
+            "name": "F782",
+            "importance": 0.0138349998742342
+        },
+        {
+            "name": "F90",
+            "importance": 0.013806000351905823
+        },
+        {
+            "name": "F264",
+            "importance": 0.0137339998036623
+        },
+        {
+            "name": "F3071",
+            "importance": 0.012215999886393547
+        },
+        {
+            "name": "F3241",
+            "importance": 0.011868000030517578
+        },
+        {
+            "name": "F3786",
+            "importance": 0.011799000203609467
+        },
+        {
             "name": "F3912",
-            "importance": 0.2676750123500824
+            "importance": 0.011370000429451466
         },
         {
-            "name": "row_abs_sum",
-            "importance": 0.07074300199747086
+            "name": "F3568",
+            "importance": 0.011215999722480774
         },
         {
-            "name": "F543",
-            "importance": 0.06583700329065323
+            "name": "F3279",
+            "importance": 0.01090100035071373
         },
         {
-            "name": "F2553",
-            "importance": 0.05232600122690201
+            "name": "F483",
+            "importance": 0.010389000177383423
         },
         {
-            "name": "row_std",
-            "importance": 0.04884500056505203
+            "name": "F558",
+            "importance": 0.010308999568223953
         },
         {
-            "name": "F265",
-            "importance": 0.04346499964594841
+            "name": "F2483",
+            "importance": 0.0100509999319911
         },
         {
-            "name": "F3913",
-            "importance": 0.040105998516082764
+            "name": "F1067",
+            "importance": 0.009736999869346619
         },
         {
-            "name": "burstiness_index",
-            "importance": 0.037679001688957214
+            "name": "F359",
+            "importance": 0.009463000111281872
         },
         {
-            "name": "F3822",
-            "importance": 0.03748900070786476
+            "name": "F1145",
+            "importance": 0.008667999878525734
         },
         {
-            "name": "F2533",
-            "importance": 0.03746100142598152
+            "name": "F3037",
+            "importance": 0.008584000170230865
         },
         {
-            "name": "F3507",
-            "importance": 0.028788000345230103
+            "name": "F883",
+            "importance": 0.008469000458717346
         },
         {
-            "name": "F3914",
-            "importance": 0.020979000255465508
+            "name": "F2591",
+            "importance": 0.008245999924838543
         },
         {
-            "name": "F3843",
-            "importance": 0.020078999921679497
+            "name": "F660",
+            "importance": 0.00790099985897541
         },
         {
-            "name": "F2481",
-            "importance": 0.017691999673843384
+            "name": "F2756",
+            "importance": 0.0077149998396635056
         },
         {
-            "name": "F1938",
-            "importance": 0.015097999945282936
+            "name": "F2401",
+            "importance": 0.00761700002476573
         },
         {
-            "name": "F1290",
-            "importance": 0.012397999875247478
+            "name": "F1977",
+            "importance": 0.007501000072807074
         },
         {
-            "name": "F2077",
-            "importance": 0.010664000175893307
-        },
-        {
-            "name": "F115_minus_F321",
-            "importance": 0.010262000374495983
-        },
-        {
-            "name": "F2524",
-            "importance": 0.00941499974578619
-        },
-        {
-            "name": "F3614",
-            "importance": 0.00940100010484457
-        },
-        {
-            "name": "F3919",
-            "importance": 0.009057000279426575
-        },
-        {
-            "name": "row_min",
-            "importance": 0.008766000159084797
-        },
-        {
-            "name": "Anomaly_Score",
-            "importance": 0.008313000202178955
-        },
-        {
-            "name": "F468",
-            "importance": 0.007838999852538109
-        },
-        {
-            "name": "F3748",
-            "importance": 0.006814000196754932
-        },
-        {
-            "name": "F2527",
-            "importance": 0.006808999925851822
-        },
-        {
-            "name": "F3633",
-            "importance": 0.00674000009894371
-        },
-        {
-            "name": "F2738",
-            "importance": 0.006227000150829554
-        },
-        {
-            "name": "F3900",
-            "importance": 0.005776999983936548
-        },
-        {
-            "name": "F3783",
-            "importance": 0.005375999957323074
-        },
-        {
-            "name": "F3750",
-            "importance": 0.0047530001029372215
-        },
-        {
-            "name": "F2233",
-            "importance": 0.004592000041157007
-        },
-        {
-            "name": "F3899",
-            "importance": 0.00446499977260828
-        },
-        {
-            "name": "F3820",
-            "importance": 0.003671000013127923
-        },
-        {
-            "name": "F339",
-            "importance": 0.0033770001027733088
-        },
-        {
-            "name": "F1740",
-            "importance": 0.003237999975681305
-        },
-        {
-            "name": "F2728",
-            "importance": 0.0032140000257641077
-        },
-        {
-            "name": "F1614",
-            "importance": 0.0030960000585764647
-        },
-        {
-            "name": "F3659",
-            "importance": 0.0026030000299215317
-        },
-        {
-            "name": "F3896",
-            "importance": 0.0025309999473392963
+            "name": "F3827",
+            "importance": 0.0073739998042583466
         }
     ],
     "data": [
         {
-            "accountId": "9074",
-            "riskScore": 100.0,
-            "anomalyScore": 87.801,
+            "accountId": "DEMO-ACC-8168",
+            "riskScore": 85.0,
+            "anomalyScore": 38.294,
             "topFeatures": [
                 {
+                    "name": "F1165",
+                    "raw": -3.7066,
+                    "contribution": 1.8327,
+                    "direction": "UP"
+                },
+                {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.098,
+                    "raw": 2.6956,
+                    "contribution": 1.0046,
                     "direction": "UP"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 12585.7521,
-                    "contribution": 0.6393,
+                    "name": "F3799",
+                    "raw": 2.6724,
+                    "contribution": 0.7971,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 1.0,
-                    "contribution": 0.3804,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 1.0,
-                    "contribution": -0.2832,
+                    "name": "F2591",
+                    "raw": -0.9286,
+                    "contribution": -0.4598,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F3722",
-                    "raw": -1.0,
-                    "contribution": -0.1226,
+                    "name": "F3151",
+                    "raw": 1.6512,
+                    "contribution": -0.1928,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9036",
-            "riskScore": 100.0,
-            "anomalyScore": 69.813,
+            "accountId": "DEMO-ACC-8333",
+            "riskScore": 80.06,
+            "anomalyScore": 50.414,
             "topFeatures": [
                 {
+                    "name": "F1165",
+                    "raw": -1.5895,
+                    "contribution": 1.1206,
+                    "direction": "UP"
+                },
+                {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.0469,
+                    "raw": 4.0274,
+                    "contribution": 1.1049,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 3.0,
-                    "contribution": -1.0367,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 17364.9124,
-                    "contribution": 0.3042,
+                    "name": "F3799",
+                    "raw": 1.6061,
+                    "contribution": 0.7588,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3913",
-                    "raw": 1.0,
-                    "contribution": -0.2359,
+                    "name": "F2591",
+                    "raw": -0.038,
+                    "contribution": -0.3824,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F1570",
-                    "raw": 1.0,
-                    "contribution": -0.2029,
+                    "name": "F1258",
+                    "raw": 0.725,
+                    "contribution": -0.2419,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9019",
-            "riskScore": 100.0,
-            "anomalyScore": 83.066,
+            "accountId": "DEMO-ACC-8234",
+            "riskScore": 73.52,
+            "anomalyScore": 38.554,
             "topFeatures": [
                 {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.1146,
+                    "name": "F1165",
+                    "raw": -1.7767,
+                    "contribution": 2.1872,
                     "direction": "UP"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 14471.3205,
-                    "contribution": 0.6319,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.3949,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F267",
-                    "raw": 0.15,
-                    "contribution": -0.2897,
+                    "name": "F3799",
+                    "raw": 1.1643,
+                    "contribution": -0.3618,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F3922",
-                    "raw": 0.0,
-                    "contribution": 0.1167,
-                    "direction": "UP"
+                    "name": "F558",
+                    "raw": 1.5098,
+                    "contribution": -0.2685,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3151",
+                    "raw": 0.6447,
+                    "contribution": -0.2401,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3912",
+                    "raw": 1.0872,
+                    "contribution": -0.2125,
+                    "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9040",
-            "riskScore": 100.0,
-            "anomalyScore": 79.624,
+            "accountId": "DEMO-ACC-8217",
+            "riskScore": 73.18,
+            "anomalyScore": 32.439,
             "topFeatures": [
                 {
+                    "name": "F1165",
+                    "raw": -1.7539,
+                    "contribution": 2.1299,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F3799",
+                    "raw": 1.6558,
+                    "contribution": 0.7667,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F2591",
+                    "raw": -0.1299,
+                    "contribution": -0.3446,
+                    "direction": "DOWN"
+                },
+                {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.1839,
+                    "raw": 1.223,
+                    "contribution": 0.2622,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.3572,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 2.0,
-                    "contribution": -0.2902,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "F267",
-                    "raw": 0.2,
-                    "contribution": -0.2592,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "F3750",
-                    "raw": -0.8,
-                    "contribution": -0.1326,
+                    "name": "F558",
+                    "raw": 0.5548,
+                    "contribution": -0.193,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9007",
-            "riskScore": 100.0,
-            "anomalyScore": 73.121,
+            "accountId": "DEMO-ACC-8275",
+            "riskScore": 60.96,
+            "anomalyScore": 40.509,
             "topFeatures": [
                 {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.0965,
+                    "name": "F1165",
+                    "raw": -2.6326,
+                    "contribution": 2.4419,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 3.0,
-                    "contribution": -0.7805,
+                    "name": "F3799",
+                    "raw": 0.4501,
+                    "contribution": -0.6269,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 35624.4451,
-                    "contribution": -0.387,
+                    "name": "F2591",
+                    "raw": -1.8209,
+                    "contribution": -0.5808,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "row_abs_sum",
-                    "raw": 50372965.4415,
-                    "contribution": -0.282,
+                    "name": "F3912",
+                    "raw": 1.0233,
+                    "contribution": -0.1909,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F3843",
-                    "raw": 266.86,
-                    "contribution": -0.1806,
+                    "name": "F2302",
+                    "raw": 0.6686,
+                    "contribution": -0.127,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9017",
-            "riskScore": 100.0,
-            "anomalyScore": 94.33,
+            "accountId": "DEMO-ACC-8425",
+            "riskScore": 58.29,
+            "anomalyScore": 67.664,
             "topFeatures": [
                 {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.1056,
+                    "raw": 3.6273,
+                    "contribution": 1.3387,
                     "direction": "UP"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 9944.4044,
-                    "contribution": 0.7388,
+                    "name": "F1165",
+                    "raw": -1.5813,
+                    "contribution": 1.2088,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.3957,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 2.0,
-                    "contribution": -0.2832,
+                    "name": "F3799",
+                    "raw": 0.4897,
+                    "contribution": -0.3802,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F1529",
-                    "raw": 1.0,
-                    "contribution": -0.1248,
+                    "name": "F2591",
+                    "raw": -2.8039,
+                    "contribution": -0.3375,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F558",
+                    "raw": 0.3434,
+                    "contribution": -0.2344,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9009",
-            "riskScore": 100.0,
-            "anomalyScore": 96.818,
+            "accountId": "DEMO-ACC-8198",
+            "riskScore": 49.55,
+            "anomalyScore": 39.641,
             "topFeatures": [
                 {
+                    "name": "F3799",
+                    "raw": 2.1474,
+                    "contribution": 1.2322,
+                    "direction": "UP"
+                },
+                {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.2757,
+                    "raw": 3.5009,
+                    "contribution": 0.9095,
                     "direction": "UP"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 187646.1917,
-                    "contribution": -0.5447,
+                    "name": "F1165",
+                    "raw": -0.9742,
+                    "contribution": -0.4544,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "row_abs_sum",
-                    "raw": 246942388.2307,
-                    "contribution": -0.4292,
+                    "name": "F2591",
+                    "raw": -0.9095,
+                    "contribution": -0.439,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 1.0,
-                    "contribution": 0.3618,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3843",
-                    "raw": 1406152.73,
-                    "contribution": 0.2355,
-                    "direction": "UP"
+                    "name": "F3836_over_F321",
+                    "raw": -2.7127,
+                    "contribution": -0.3269,
+                    "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9013",
-            "riskScore": 100.0,
-            "anomalyScore": 96.208,
+            "accountId": "DEMO-ACC-8371",
+            "riskScore": 45.49,
+            "anomalyScore": 63.865,
             "topFeatures": [
                 {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.2114,
+                    "name": "F3799",
+                    "raw": 2.36,
+                    "contribution": 1.0469,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 3.0,
-                    "contribution": -0.7314,
+                    "name": "F3912",
+                    "raw": 1.451,
+                    "contribution": 0.6148,
+                    "direction": "UP"
+                },
+                {
+                    "name": "F2591",
+                    "raw": -0.5752,
+                    "contribution": -0.4622,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 43260.975,
-                    "contribution": -0.4158,
+                    "name": "F3836_over_F321",
+                    "raw": -2.0212,
+                    "contribution": -0.2776,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "row_abs_sum",
-                    "raw": 66838206.4003,
-                    "contribution": -0.316,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "F3843",
-                    "raw": 70.99,
-                    "contribution": -0.1337,
+                    "name": "F558",
+                    "raw": 0.7988,
+                    "contribution": -0.2158,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9044",
-            "riskScore": 100.0,
-            "anomalyScore": 92.818,
+            "accountId": "DEMO-ACC-8315",
+            "riskScore": 34.63,
+            "anomalyScore": 71.438,
             "topFeatures": [
                 {
+                    "name": "F1165",
+                    "raw": -1.9221,
+                    "contribution": 2.251,
+                    "direction": "UP"
+                },
+                {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.0519,
-                    "direction": "UP"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 9029.5591,
-                    "contribution": 0.803,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.3678,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F267",
-                    "raw": 0.23,
-                    "contribution": -0.17,
+                    "raw": 0.1834,
+                    "contribution": -1.1891,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F1529",
-                    "raw": 1.0,
-                    "contribution": -0.1306,
+                    "name": "F3799",
+                    "raw": 0.6682,
+                    "contribution": -0.5002,
                     "direction": "DOWN"
+                },
+                {
+                    "name": "F2591",
+                    "raw": -2.5434,
+                    "contribution": -0.4216,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3696",
+                    "raw": -1.3449,
+                    "contribution": 0.1695,
+                    "direction": "UP"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9032",
-            "riskScore": 100.0,
-            "anomalyScore": 86.391,
+            "accountId": "DEMO-ACC-8015",
+            "riskScore": 28.62,
+            "anomalyScore": 50.764,
             "topFeatures": [
                 {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 5.9021,
+                    "raw": 2.0081,
+                    "contribution": 1.2536,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 3.0,
-                    "contribution": -0.9387,
+                    "name": "F1165",
+                    "raw": -0.8776,
+                    "contribution": -0.969,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 9513.8928,
-                    "contribution": 0.5187,
+                    "name": "F3799",
+                    "raw": -0.1036,
+                    "contribution": -0.7671,
+                    "direction": "DOWN"
+                },
+                {
+                    "name": "F3836_over_F321",
+                    "raw": 1.6232,
+                    "contribution": 0.359,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3783",
-                    "raw": -1.0,
-                    "contribution": -0.1699,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "F3913",
-                    "raw": 1.0,
-                    "contribution": -0.1532,
-                    "direction": "DOWN"
+                    "name": "F2591",
+                    "raw": 0.5299,
+                    "contribution": 0.1733,
+                    "direction": "UP"
                 }
             ],
-            "status": "Critical"
+            "status": "High Risk"
         },
         {
-            "accountId": "9070",
-            "riskScore": 100.0,
-            "anomalyScore": 86.32,
+            "accountId": "DEMO-ACC-8037",
+            "riskScore": 23.69,
+            "anomalyScore": 64.89,
             "topFeatures": [
                 {
                     "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 5.7466,
+                    "raw": 3.7605,
+                    "contribution": 1.1098,
                     "direction": "UP"
                 },
                 {
-                    "name": "F364",
-                    "raw": 1.04,
-                    "contribution": -0.8365,
+                    "name": "F1165",
+                    "raw": -0.8655,
+                    "contribution": -0.8302,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "burstiness_index",
-                    "raw": 10712.218,
-                    "contribution": 0.7816,
+                    "name": "F3836_over_F321",
+                    "raw": 31.7407,
+                    "contribution": 0.5779,
                     "direction": "UP"
                 },
                 {
-                    "name": "F3899",
-                    "raw": 1.0,
-                    "contribution": 0.3742,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 3.0,
-                    "contribution": -0.2902,
-                    "direction": "DOWN"
-                }
-            ],
-            "status": "Critical"
-        },
-        {
-            "accountId": "9049",
-            "riskScore": 100.0,
-            "anomalyScore": 94.223,
-            "topFeatures": [
-                {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.2773,
-                    "direction": "UP"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 16563.0442,
-                    "contribution": 0.5062,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 1.0,
-                    "contribution": 0.4014,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F1529",
-                    "raw": 1.0,
-                    "contribution": -0.1208,
+                    "name": "F2591",
+                    "raw": -1.5326,
+                    "contribution": -0.3837,
                     "direction": "DOWN"
                 },
                 {
-                    "name": "F2183",
-                    "raw": 0.0429,
-                    "contribution": -0.1179,
+                    "name": "F3799",
+                    "raw": 1.3254,
+                    "contribution": -0.3458,
                     "direction": "DOWN"
                 }
             ],
-            "status": "Critical"
-        },
-        {
-            "accountId": "9055",
-            "riskScore": 100.0,
-            "anomalyScore": 97.18,
-            "topFeatures": [
-                {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 5.7592,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F364",
-                    "raw": 1.05,
-                    "contribution": -0.8365,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 11831.8073,
-                    "contribution": 0.7321,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.4037,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 1.0,
-                    "contribution": -0.2832,
-                    "direction": "DOWN"
-                }
-            ],
-            "status": "Critical"
-        },
-        {
-            "accountId": "9043",
-            "riskScore": 100.0,
-            "anomalyScore": 83.964,
-            "topFeatures": [
-                {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.2293,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.4027,
-                    "direction": "UP"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 16935.1192,
-                    "contribution": 0.3828,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 0.0,
-                    "contribution": 0.1167,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F1529",
-                    "raw": 0.0,
-                    "contribution": 0.1066,
-                    "direction": "UP"
-                }
-            ],
-            "status": "Critical"
-        },
-        {
-            "accountId": "9080",
-            "riskScore": 100.0,
-            "anomalyScore": 88.556,
-            "topFeatures": [
-                {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.1066,
-                    "direction": "UP"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 6652.6331,
-                    "contribution": 0.748,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 0.0,
-                    "contribution": 0.4008,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3922",
-                    "raw": 0.0,
-                    "contribution": 0.1167,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F1529",
-                    "raw": 0.0,
-                    "contribution": 0.1102,
-                    "direction": "UP"
-                }
-            ],
-            "status": "Critical"
-        },
-        {
-            "accountId": "9063",
-            "riskScore": 100.0,
-            "anomalyScore": 70.953,
-            "topFeatures": [
-                {
-                    "name": "F3912",
-                    "raw": 1.0,
-                    "contribution": 6.0266,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F3899",
-                    "raw": 3.0,
-                    "contribution": -1.0424,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "F3913",
-                    "raw": 1.0,
-                    "contribution": -0.2405,
-                    "direction": "DOWN"
-                },
-                {
-                    "name": "burstiness_index",
-                    "raw": 16482.0662,
-                    "contribution": 0.2153,
-                    "direction": "UP"
-                },
-                {
-                    "name": "F1321",
-                    "raw": 11001.0,
-                    "contribution": -0.1285,
-                    "direction": "DOWN"
-                }
-            ],
-            "status": "Critical"
+            "status": "High Risk"
         }
     ]
 }

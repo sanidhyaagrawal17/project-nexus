@@ -14,3 +14,11 @@ ml-pipeline/data/**/*.csv
 ml-pipeline/data/hackathon_mule_data.csv
 testdata/
 tmp_alert.json
+.env*
+venv/
+data/
+uploads/
+outputs/
+__pycache__/
+
+*.csv

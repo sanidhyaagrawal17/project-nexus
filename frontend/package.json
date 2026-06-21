@@ -19,12 +19,17 @@
     "globals": true
   },
   "dependencies": {
+    "@rolldown/binding-linux-x64-gnu": "^1.1.1",
+    "d3-geo": "^3.1.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-force-graph-2d": "^1.29.1",
     "react-hot-toast": "^2.6.0",
     "react-is": "^18.3.1",
+    "react-simple-maps": "^3.0.0",
     "recharts": "^3.8.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "topojson-client": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
